@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter, Outfit, JetBrains_Mono } from "next/font/google";
+import "leaflet/dist/leaflet.css";
 import "./globals.css";
 import { AppProvider } from "@/context/AppContext";
 
@@ -22,9 +23,9 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "AETHER - AI Crime Analytics & Tactical Intelligence Platform",
-  description: "AETHER is a modern AI-powered command-center intelligence dashboard that transforms siloed police records and socio-economic data into actionable predictive insights for Delhi NCR.",
-  keywords: ["crime analytics", "predictive policing", "tactical intelligence", "geospatial maps", "delhi ncr"],
+  title: "K-NETRA - AI Crime Analytics & Tactical Intelligence Platform",
+  description: "K-NETRA is a modern AI-powered command-center intelligence dashboard that transforms siloed police records and socio-economic data into actionable predictive insights for Karnataka.",
+  keywords: ["crime analytics", "predictive policing", "tactical intelligence", "geospatial maps", "karnataka"],
 };
 
 export default function RootLayout({

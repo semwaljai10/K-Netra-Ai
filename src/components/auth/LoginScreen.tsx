@@ -2,12 +2,13 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '@/context/AppContext';
-import { ShieldAlert, Lock, User, Terminal, ArrowRight } from 'lucide-react';
+import { ShieldAlert, Lock, User, Terminal, ArrowRight, Eye, EyeOff } from 'lucide-react';
 
 export default function LoginScreen() {
   const { login, sessionTerminationReason, setSessionTerminationReason } = useApp();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [telemetry, setTelemetry] = useState('SECURE GATEWAY READY: ENTER SIGNATURE');
@@ -21,10 +22,12 @@ export default function LoginScreen() {
     }
   }, []);
 
-  // Display alert pop-up when a new login termination is detected
+  // Display alert pop-up when a session termination is detected
   useEffect(() => {
     if (sessionTerminationReason === 'new-login') {
       alert('SECURITY ALERT: A new login has been detected from another device/browser. You have been logged out of this device.');
+    } else if (sessionTerminationReason === 'terminated') {
+      alert('SECURITY ALERT: Your session has been terminated by an administrator.');
     }
   }, [sessionTerminationReason]);
 
@@ -87,7 +90,7 @@ export default function LoginScreen() {
           <div className="login-logo">
             <Terminal size={24} />
           </div>
-          <h1>AETHER COMMAND</h1>
+          <h1>K-NETRA COMMAND</h1>
           <p>{telemetry}</p>
         </div>
 
@@ -118,8 +121,8 @@ export default function LoginScreen() {
             <label className="login-input-label">Command Passcode</label>
             <div className="login-input-wrap">
               <input
-                type="password"
-                className="login-input"
+                type={showPassword ? "text" : "password"}
+                className="login-input login-input-password"
                 placeholder="••••••••••••••••"
                 value={password}
                 onChange={(e) => {
@@ -131,6 +134,15 @@ export default function LoginScreen() {
                 autoComplete="current-password"
               />
               <Lock className="login-input-icon" size={16} />
+              <button
+                type="button"
+                className="login-password-toggle"
+                onClick={() => setShowPassword(!showPassword)}
+                disabled={loading}
+                aria-label={showPassword ? "Hide passcode" : "Show passcode"}
+              >
+                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
             </div>
           </div>
 
@@ -147,6 +159,13 @@ export default function LoginScreen() {
             <div className="login-error-msg" style={{ borderColor: 'var(--color-red)', background: 'rgba(239, 68, 68, 0.15)', color: 'var(--color-red)' }}>
               <ShieldAlert size={16} />
               <span style={{ fontWeight: 'bold' }}>SECURITY ALERT: New login detected. Session terminated.</span>
+            </div>
+          )}
+
+          {sessionTerminationReason === 'terminated' && !error && (
+            <div className="login-error-msg" style={{ borderColor: 'var(--color-red)', background: 'rgba(239, 68, 68, 0.15)', color: 'var(--color-red)' }}>
+              <ShieldAlert size={16} />
+              <span style={{ fontWeight: 'bold' }}>SECURITY ALERT: Session terminated by administrator.</span>
             </div>
           )}
 

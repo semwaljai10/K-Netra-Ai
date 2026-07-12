@@ -2,19 +2,20 @@
 
 import React, { useEffect, useState } from 'react';
 import { useApp, ActiveView } from '@/context/AppContext';
-import { 
-  LayoutDashboard, 
-  MapPin, 
-  Share2, 
-  Users, 
-  TrendingUp, 
+import {
+  LayoutDashboard,
+  MapPin,
+  Share2,
+  Users,
+  TrendingUp,
   BrainCircuit,
   Terminal,
   UserCheck,
   LogOut,
   Sun,
   Moon,
-  Monitor
+  Monitor,
+  FilePlus
 } from 'lucide-react';
 
 interface NavLink {
@@ -39,7 +40,7 @@ export default function Sidebar() {
       const timeStr = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
       setTimeStr(`${dateStr} | ${timeStr}`);
     };
-    
+
     updateTime();
     const interval = setInterval(updateTime, 1000);
     return () => clearInterval(interval);
@@ -50,8 +51,9 @@ export default function Sidebar() {
     { view: 'map', label: 'Geospatial Hotspots', icon: MapPin },
     { view: 'network', label: 'Syndicate Links', icon: Share2 },
     { view: 'offenders', label: 'Criminal Dossiers', icon: Users },
-    { view: 'socio', label: 'Socio-Economic Corr', icon: TrendingUp },
-    { view: 'predictor', label: 'AI Predictor Model', icon: BrainCircuit }
+    { view: 'socio', label: 'Socio-Economic Correlation', icon: TrendingUp },
+    { view: 'predictor', label: 'AI Predictor Model', icon: BrainCircuit },
+    { view: 'report', label: 'Report Incident', icon: FilePlus }
   ];
 
   if (currentUser?.isAdmin) {
@@ -65,10 +67,10 @@ export default function Sidebar() {
           <div className="logo-icon">
             <Terminal size={18} />
           </div>
-          <span className="logo-text">AETHER AI</span>
+          <span className="logo-text">K-NETRA AI</span>
         </div>
-        <div style={{ fontSize: '0.6rem', color: 'var(--text-dark)', marginTop: '0.25rem', letterSpacing: '0.5px' }}>
-          NCR TACTICAL UNIT
+        <div className="sidebar-subtext" style={{ fontSize: '0.65rem', color: 'var(--text-dark)', marginTop: '0.25rem', letterSpacing: '0.5px' }}>
+          KSP TACTICAL UNIT
         </div>
       </div>
 
@@ -134,8 +136,8 @@ export default function Sidebar() {
               }}>{currentUser?.role || 'Control Room'}</span>
             </div>
           </button>
-          <button 
-            onClick={logout} 
+          <button
+            onClick={logout}
             className="btn-logout"
             title="Lock Command Station"
             style={{

@@ -247,7 +247,7 @@ export default function UserProfile() {
         </GlassPanel>
 
         <div style={{ fontSize: '0.65rem', color: 'var(--text-dark)', textAlign: 'center', fontFamily: 'var(--font-family-mono)', padding: '0.25rem' }}>
-          NCR LOGICAL AUTH LEVEL :: SECURE_PORT_{currentUser.isAdmin ? 'A' : 'V'}
+          KARNATAKA LOGICAL AUTH LEVEL :: SECURE_PORT_{currentUser.isAdmin ? 'A' : 'V'}
         </div>
       </div>
 
@@ -477,21 +477,19 @@ export default function UserProfile() {
                     <input 
                       type="text" 
                       value={department}
-                      onChange={e => setDepartment(e.target.value)}
+                      disabled
                       required
                       style={{
-                        background: 'rgba(0,0,0,0.25)',
-                        border: '1px solid rgba(255,255,255,0.08)',
+                        background: 'rgba(0,0,0,0.15)',
+                        border: '1px solid rgba(255,255,255,0.04)',
                         borderRadius: '6px',
                         padding: '0.55rem 0.55rem 0.55rem 2.2rem',
-                        color: 'var(--text-primary)',
+                        color: 'var(--text-muted)',
                         fontSize: '0.85rem',
                         outline: 'none',
                         width: '100%',
-                        transition: 'border-color 0.2s'
+                        cursor: 'not-allowed'
                       }}
-                      onFocus={e => e.currentTarget.style.borderColor = 'var(--color-blue)'}
-                      onBlur={e => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'}
                     />
                   </div>
                 </div>

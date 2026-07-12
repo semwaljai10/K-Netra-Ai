@@ -23,30 +23,30 @@ export function getSeverityStyles(severity: 'Critical' | 'High' | 'Medium' | 'Lo
   switch (severity) {
     case 'Critical':
       return {
-        bg: 'rgba(239, 68, 68, 0.12)',
+        bg: 'var(--color-red-badge)',
         color: 'var(--color-red)',
-        border: '1px solid rgba(239, 68, 68, 0.25)',
+        border: '1px solid var(--color-red)',
         text: 'text-red'
       };
     case 'High':
       return {
-        bg: 'rgba(245, 158, 11, 0.12)',
+        bg: 'var(--color-yellow-badge)',
         color: 'var(--color-yellow)',
-        border: '1px solid rgba(245, 158, 11, 0.25)',
+        border: '1px solid var(--color-yellow)',
         text: 'text-yellow'
       };
     case 'Medium':
       return {
-        bg: 'rgba(59, 130, 246, 0.12)',
+        bg: 'var(--color-blue-badge)',
         color: 'var(--color-blue)',
-        border: '1px solid rgba(59, 130, 246, 0.25)',
+        border: '1px solid var(--color-blue)',
         text: 'text-blue'
       };
     case 'Low':
       return {
-        bg: 'rgba(16, 185, 129, 0.12)',
+        bg: 'var(--color-success-badge)',
         color: 'var(--color-success)',
-        border: '1px solid rgba(16, 185, 129, 0.25)',
+        border: '1px solid var(--color-success)',
         text: 'text-success'
       };
     default:
@@ -63,8 +63,7 @@ export function getSeverityStyles(severity: 'Critical' | 'High' | 'Medium' | 'Lo
 export function exportIncidentMatrixToCSV(activeIncidents: Incident[], offenders: Offender[]) {
   if (activeIncidents.length === 0) return;
 
-  let csvContent = "data:text/csv;charset=utf-8,";
-  csvContent += "IncidentID,Classification,Sector,Severity,Timestamp,AssignedSuspect,Status\n";
+  let csvContent = "IncidentID,Classification,Sector,Severity,Timestamp,AssignedSuspect,Status\n";
 
   activeIncidents.forEach(inc => {
     const offender = offenders.find(o => o.id === inc.offenderId);
@@ -75,11 +74,14 @@ export function exportIncidentMatrixToCSV(activeIncidents: Incident[], offenders
     csvContent += row + "\n";
   });
 
-  const encodedUri = encodeURI(csvContent);
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+
   const link = document.createElement("a");
-  link.setAttribute("href", encodedUri);
-  link.setAttribute("download", `AETHER_Incidents_Report_${new Date().toISOString().split('T')[0]}.csv`);
+  link.setAttribute("href", url);
+  link.setAttribute("download", `K-NETRA_Incidents_Report_${new Date().toISOString().split('T')[0]}.csv`);
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
+  URL.revokeObjectURL(url);
 }

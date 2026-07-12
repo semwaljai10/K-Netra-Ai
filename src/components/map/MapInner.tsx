@@ -4,7 +4,6 @@ import React, { useEffect, useRef } from 'react';
 import { useApp } from '@/context/AppContext';
 import { MOCK_DISTRICTS, MOCK_STATES, Incident } from '@/lib/data';
 import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
 
 // Dynamic HSL color generator for states to provide harmonized, distinct district perimeters
 const getStateColor = (stateId: string, theme?: 'light' | 'dark') => {
@@ -155,8 +154,10 @@ export default function MapInner() {
     markersGroup.clearLayers();
 
     filteredIncidents.forEach(inc => {
+      console.log('Drawing incident:', inc.id, inc.coords);
       const pulsingIcon = L.divIcon({
-        className: `custom-pulsing-marker severity-glow-${inc.severity}`,
+        className: 'custom-pulsing-marker-container',
+        html: `<div class="custom-pulsing-marker severity-glow-${inc.severity}"></div>`,
         iconSize: [14, 14],
         iconAnchor: [7, 7]
       });

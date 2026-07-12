@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useApp } from '@/context/AppContext';
 import { Scatter, Bar } from 'react-chartjs-2';
 import GlassPanel from '../ui/GlassPanel';
@@ -14,18 +14,38 @@ import {
   Legend, 
   ChartOptions 
 } from 'chart.js';
-import { MOCK_SOCIO_ECONOMIC, AI_SIMULATION_WEIGHTS } from '@/lib/data';
+import { MOCK_SOCIO_ECONOMIC, AI_SIMULATION_WEIGHTS, MOCK_DISTRICTS } from '@/lib/data';
 import { Lightbulb, ShieldAlert, Award } from 'lucide-react';
 
 ChartJS.register(LinearScale, PointElement, LineElement, BarElement, Tooltip, Legend);
 
 export default function CorrelationCharts() {
-  const { resolvedTheme } = useApp();
+  const { resolvedTheme, selectedStateId, districtFilter } = useApp();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // Filter socio-economic data based on selected state and district
+  const filteredSocioData = useMemo(() => {
+    return MOCK_SOCIO_ECONOMIC.filter(item => {
+      // 1. State Filter
+      if (selectedStateId && selectedStateId !== 'ALL') {
+        const district = MOCK_DISTRICTS[item.districtId];
+        if (!district || district.stateId !== selectedStateId) {
+          return false;
+        }
+      }
+      // 2. District Filter
+      if (districtFilter && districtFilter !== 'ALL') {
+        if (item.districtId !== districtFilter) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [selectedStateId, districtFilter]);
 
   if (!mounted) {
     return <div style={{ textAlign: 'center', padding: '5rem', color: 'var(--text-dark)' }}>Syncing telemetry analytics...</div>;
@@ -36,7 +56,7 @@ export default function CorrelationCharts() {
     datasets: [
       {
         label: 'Sector Crime Densities',
-        data: MOCK_SOCIO_ECONOMIC.map(item => ({
+        data: filteredSocioData.map(item => ({
           x: item.unemploymentRate,
           y: item.crimeRate,
           label: item.districtName
@@ -178,9 +198,9 @@ export default function CorrelationCharts() {
           <div className="insight-point">
             <ShieldAlert size={18} className="insight-icon" style={{ color: 'var(--color-red)' }} />
             <div className="insight-text">
-              <h4>East Delhi Corridor Alert</h4>
+              <h4>Bengaluru Urban Corridor Alert</h4>
               <p>
-                Unemployment spikes (9.8% in East Delhi Border) match severe crime indices (58.2/100k). Model designates this sector as highly volatile. Social security measures recommended to buffer crime surges.
+                Crime surges in Bengaluru Urban (293 recorded incidents, heavily skewed towards Cybercrime) correlate with higher municipal transaction volumes and technological infrastructure densities. Special cyber policing units are recommended.
               </p>
             </div>
           </div>
@@ -188,9 +208,9 @@ export default function CorrelationCharts() {
           <div className="insight-point">
             <Award size={18} className="insight-icon" style={{ color: 'var(--color-success)' }} />
             <div className="insight-text">
-              <h4>Lighting & Patrol Efficacy</h4>
+              <h4>Infrastructure & Patrol Efficacy</h4>
               <p>
-                Streetlight coverage has the highest infrastructure correlation value (-0.95 weight). Broadening streetlight installation from 48% to 90% is forecasted to reduce night larceny events by up to 34% in East Delhi.
+                Streetlight coverage has the highest infrastructure correlation weight (-0.95). Broadening streetlight coverage in critical zones within Dakshina Kannada (164 recorded incidents) is forecasted to reduce night-time physical offenses by up to 28%.
               </p>
             </div>
           </div>

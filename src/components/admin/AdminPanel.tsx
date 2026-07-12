@@ -15,7 +15,8 @@ import {
   User,
   PlusCircle,
   Trash2,
-  ShieldCheck
+  ShieldCheck,
+  LogOut
 } from 'lucide-react';
 
 interface AuditLog {
@@ -27,11 +28,28 @@ interface AuditLog {
 }
 
 export default function AdminPanel() {
-  const { fetchAuditLogs, fetchUsers, createUser, deleteUser, currentUser } = useApp();
+  const { fetchAuditLogs, fetchUsers, createUser, deleteUser, currentUser, terminateSession } = useApp();
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [users, setUsers] = useState<{ normal: any[]; admin: any[] }>({ normal: [], admin: [] });
   const [loading, setLoading] = useState(false);
   const [usersLoading, setUsersLoading] = useState(false);
+
+  const handleTerminateSession = async (username: string) => {
+    if (confirm(`Are you sure you want to terminate operator ${username}'s active session?`)) {
+      try {
+        const success = await terminateSession(username);
+        if (success) {
+          alert(`Session for ${username} has been terminated.`);
+          loadLogs(logSearchText); // Reload logs to reflect they are no longer active
+        } else {
+          alert('Could not terminate session.');
+        }
+      } catch (err) {
+        console.error(err);
+        alert('Error terminating session.');
+      }
+    }
+  };
 
   // Form states
   const [name, setName] = useState('');
@@ -195,7 +213,7 @@ export default function AdminPanel() {
           </div>
           <div className="metric-info">
             <span className="metric-label">DB Cluster</span>
-            <span className="metric-value" style={{ fontSize: '1rem', fontFamily: 'var(--font-family-mono)', color: 'var(--color-purple)' }}>nl0h71zj</span>
+            <span className="metric-value" style={{ fontSize: '1rem', fontFamily: 'var(--font-family-mono)', color: 'var(--color-purple)' }}>supabase-db</span>
           </div>
         </GlassPanel>
       </div>
@@ -587,12 +605,22 @@ export default function AdminPanel() {
                   <th>Operator ID</th>
                   <th>IP Address</th>
                   <th>Geographic Location</th>
-                  <th style={{ textAlign: 'right' }}>Device Signature</th>
+                  <th>Device Signature</th>
+                  {currentUser?.level === 2 && <th style={{ textAlign: 'right' }}>Actions</th>}
                 </tr>
               </thead>
               <tbody>
                 {logs.map((log, index) => {
                   const isAdmin = log.user.toUpperCase().startsWith('A');
+                  const isSelf = log.user.trim().toLowerCase() === currentUser?.username.trim().toLowerCase();
+                  
+                  // Find the target user object to check their admin level
+                  const targetUserObj = users.admin.find(u => u.username.trim().toLowerCase() === log.user.trim().toLowerCase()) 
+                                     || users.normal.find(u => u.username.trim().toLowerCase() === log.user.trim().toLowerCase());
+                  const isL2Admin = targetUserObj && targetUserObj.level === 2;
+                  
+                  // L2 Admin can terminate normal users or L1 Admin sessions, but not L2 Admins or self
+                  const canTerminate = currentUser?.level === 2 && !isSelf && !isL2Admin;
                   
                   return (
                     <tr key={index}>
@@ -620,12 +648,43 @@ export default function AdminPanel() {
                         <Globe size={12} style={{ color: 'var(--text-dark)' }} />
                         {log.loc}
                       </td>
-                      <td style={{ textAlign: 'right', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                      <td style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                         <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
                           <Monitor size={12} style={{ color: 'var(--text-dark)' }} />
                           {log.dev}
                         </span>
                       </td>
+                      {currentUser?.level === 2 && (
+                        <td style={{ textAlign: 'right' }}>
+                          {canTerminate ? (
+                            <button
+                              onClick={() => handleTerminateSession(log.user)}
+                              style={{
+                                background: 'rgba(239, 68, 68, 0.08)',
+                                border: '1px solid rgba(239, 68, 68, 0.25)',
+                                color: 'var(--color-red)',
+                                padding: '0.25rem 0.5rem',
+                                borderRadius: '4px',
+                                fontSize: '0.7rem',
+                                fontWeight: 'bold',
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.25rem',
+                                transition: 'all 0.2s'
+                              }}
+                              title="Force Terminate Session"
+                            >
+                              <LogOut size={11} />
+                              Terminate
+                            </button>
+                          ) : (
+                            <span style={{ fontSize: '0.7rem', color: 'var(--text-dark)', fontStyle: 'italic' }}>
+                              Protected
+                            </span>
+                          )}
+                        </td>
+                      )}
                     </tr>
                   );
                 })}

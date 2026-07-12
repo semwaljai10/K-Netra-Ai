@@ -39,13 +39,15 @@ import AdminPanel from '@/components/admin/AdminPanel';
 // View: User Profile Panel
 import UserProfile from '@/components/profile/UserProfile';
 
+// View: Report Incident
+import ReportIncident from '@/components/report/ReportIncident';
+
 // Auth Screen
 import LoginScreen from '@/components/auth/LoginScreen';
 import ForcePasswordChange from '@/components/auth/ForcePasswordChange';
 
 export default function Home() {
   const { currentView, isAuthenticated, mobileSidebarOpen, setMobileSidebarOpen, currentUser } = useApp();
-
   if (!isAuthenticated) {
     return <LoginScreen />;
   }
@@ -104,6 +106,8 @@ export default function Home() {
         return <AdminPanel />;
       case 'profile':
         return <UserProfile />;
+      case 'report':
+        return <ReportIncident />;
       default:
         return (
           <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-dark)' }}>
@@ -119,7 +123,7 @@ export default function Home() {
       <Sidebar />
 
       {/* Mobile Sidebar Overlay */}
-      <div 
+      <div
         className={`sidebar-overlay ${mobileSidebarOpen ? 'open' : ''}`}
         onClick={() => setMobileSidebarOpen(false)}
       ></div>
@@ -130,7 +134,7 @@ export default function Home() {
         <Header />
 
         {/* Dynamic View Component */}
-        <div style={{ flexGrow: 1 }}>
+        <div className="view-content-wrapper">
           {renderActiveView()}
         </div>
       </main>

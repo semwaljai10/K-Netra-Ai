@@ -1,9 +1,16 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useMemo } from 'react';
-import { MOCK_INCIDENTS, MOCK_OFFENDERS, MOCK_ANOMALIES, MOCK_DISTRICTS, Incident, Offender, Anomaly } from '@/lib/data';
+import {
+  MOCK_INCIDENTS, MOCK_OFFENDERS, MOCK_ANOMALIES, MOCK_DISTRICTS,
+  MOCK_SYNDICATE_LINKS, MOCK_SYNDICATE_CLUSTERS, MOCK_CENTRALITY_MAP,
+  Incident, Offender, Anomaly, SyndicateLink, SyndicateCluster, CentralityData,
+  rawCrimeData, adaptSupabaseRecord, processRawIncidentsData, mapCaseStatusToConviction
+} from '@/lib/data';
+import { ALL_SIGNAL_TYPES } from '@/lib/syndicateAnalysis';
+import { supabase } from '@/lib/supabase';
 
-export type ActiveView = 'dashboard' | 'map' | 'network' | 'offenders' | 'socio' | 'predictor' | 'admin' | 'profile';
+export type ActiveView = 'dashboard' | 'map' | 'network' | 'offenders' | 'socio' | 'predictor' | 'admin' | 'profile' | 'report';
 export type ThemeMode = 'system' | 'light' | 'dark';
 
 interface AppContextType {
@@ -55,6 +62,22 @@ interface AppContextType {
   deleteUser: (username: string, type: 'normal' | 'admin') => Promise<boolean>;
   updateProfile: (details: { name: string; role: string; email: string; phone: string; department: string }) => Promise<boolean>;
   changePassword: (oldPassword: string, newPassword: string) => Promise<{ success: boolean; message: string }>;
+  terminateSession: (username: string) => Promise<boolean>;
+  reportIncident: (newRecord: any, formattedIncident: Incident, newOffender?: Offender) => Promise<string | null>;
+  verifyCredentials: (username: string, password: string) => Promise<{ valid: boolean; name: string; username: string }>;
+  updateIncidentStatus: (incidentId: string, newRawStatus: string, remarks: string, modifiedBy: string, modifiedByUserId: string, closureDetails?: any, chargeSheetFiled?: boolean) => Promise<void>;
+  // Syndicate analysis
+  syndicateLinks: SyndicateLink[];
+  syndicateClusters: SyndicateCluster[];
+  centralityMap: Map<string, CentralityData>;
+  selectedSyndicateId: string | null;
+  setSelectedSyndicateId: (id: string | null) => void;
+  linkStrengthFilter: number;
+  setLinkStrengthFilter: (value: number) => void;
+  activeSignalFilters: string[];
+  setActiveSignalFilters: (signals: string[]) => void;
+  highlightedNodeId: string | null;
+  setHighlightedNodeId: (id: string | null) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -105,7 +128,11 @@ const fetchDbValue = async (key: string): Promise<string> => {
   if (json.error) {
     throw new Error(`Failed to fetch key "${key}" from proxy: ${json.error}`);
   }
-  return json.data || '';
+  const val = json.data || '';
+  if (val === 'Value Not Found' || val === 'Not Found' || val.includes('error')) {
+    return '';
+  }
+  return val;
 };
 
 const updateDbValue = async (key: string, value: string): Promise<boolean> => {
@@ -281,7 +308,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [currentView, setCurrentView] = useState<ActiveView>('dashboard');
   const [searchQuery, setSearchQuery] = useState('');
   const [severityFilter, setSeverityFilter] = useState('ALL');
-  const [selectedStateId, setSelectedStateId] = useState('ALL');
+  const [selectedStateId, setSelectedStateId] = useState('KA');
   const [districtFilter, setDistrictFilter] = useState('ALL');
   const [selectedIncidentId, setSelectedIncidentId] = useState<string | null>(null);
   const [selectedOffenderId, setSelectedOffenderId] = useState<string | null>(null);
@@ -303,6 +330,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
     mustChangePassword?: boolean;
   } | null>(null);
 
+
+  // Syndicate analysis state
+  const [selectedSyndicateId, setSelectedSyndicateId] = useState<string | null>(null);
+  const [linkStrengthFilter, setLinkStrengthFilter] = useState<number>(0.30);
+  const [activeSignalFilters, setActiveSignalFilters] = useState<string[]>([...ALL_SIGNAL_TYPES]);
+  const [highlightedNodeId, setHighlightedNodeId] = useState<string | null>(null);
+
+  const [rawIncidents, setRawIncidents] = useState<any[]>(() => [...rawCrimeData]);
+
+  const {
+    incidents,
+    offenders,
+    syndicateLinks,
+    syndicateClusters,
+    centralityMap
+  } = useMemo(() => {
+    return processRawIncidentsData(rawIncidents);
+  }, [rawIncidents]);
+
+
   // Load session from storage during runtime
   useEffect(() => {
     const session = localStorage.getItem('aether_session');
@@ -314,9 +361,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const isAdmin = localStorage.getItem('aether_operator_is_admin') === 'true';
       const levelStr = localStorage.getItem('aether_operator_level');
       const level = levelStr ? Number(levelStr) : undefined;
-      const email = localStorage.getItem('aether_operator_email') || `${username}@aether.gov.in`;
+      const email = localStorage.getItem('aether_operator_email') || `${username}@k-netra.gov.in`;
       const phone = localStorage.getItem('aether_operator_phone') || '+91 98765 43210';
-      const department = localStorage.getItem('aether_operator_department') || 'NCR Tactical Unit';
+      const department = localStorage.getItem('aether_operator_department') || 'Karnataka Tactical Unit';
       const badgeNumber = localStorage.getItem('aether_operator_badge') || `${isAdmin ? 'BADGE-A' : 'BADGE-V'}-${username.substring(1)}`;
       const joinedDate = localStorage.getItem('aether_operator_joined') || '2024-03-15';
       const mustChangePassword = localStorage.getItem('aether_operator_must_change_password') === 'true';
@@ -384,6 +431,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [theme]);
 
   const logout = () => {
+    if (typeof window !== 'undefined') {
+      const username = localStorage.getItem('aether_username');
+      if (username) {
+        updateDbValue(`active_session_${username.trim().toLowerCase()}`, '').catch(err => {
+          console.error('Failed to clear remote session ID on logout:', err);
+        });
+      }
+    }
     setIsAuthenticated(false);
     setCurrentUser(null);
     localStorage.removeItem('aether_session');
@@ -574,9 +629,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         role: operatorRole,
         isAdmin,
         level,
-        email: userObj?.email || `${cleanUsername}@aether.gov.in`,
+        email: userObj?.email || `${cleanUsername}@k-netra.gov.in`,
         phone: userObj?.phone || '+91 98765 43210',
-        department: userObj?.department || 'NCR Tactical Unit',
+        department: userObj?.department || 'Karnataka Tactical Unit',
         badgeNumber: userObj?.badgeNumber || `${isAdmin ? 'BADGE-A' : 'BADGE-V'}-${cleanUsername.substring(1)}`,
         joinedDate: userObj?.joinedDate || '2024-03-15',
         mustChangePassword
@@ -686,10 +741,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
     try {
       await Promise.all(usernames.map(async (uname) => {
         try {
-          const rawLogs = await fetchDbValue(`audit_logs_${uname}`);
-          if (rawLogs) {
-            const decoded = decodeLogs(rawLogs);
-            allLogs = allLogs.concat(decoded);
+          const activeSessionId = await fetchDbValue(`active_session_${uname}`);
+          if (activeSessionId && activeSessionId !== 'terminated') {
+            const rawLogs = await fetchDbValue(`audit_logs_${uname}`);
+            if (rawLogs) {
+              const decoded = decodeLogs(rawLogs);
+              if (decoded.length > 0) {
+                // Only return the most recent log of the active session
+                allLogs.push(decoded[0]);
+              }
+            }
           }
         } catch (e) {
           console.error(`Failed to fetch logs for ${uname}:`, e);
@@ -702,7 +763,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         return timeB - timeA;
       });
       
-      return allLogs.slice(0, 16);
+      return allLogs;
     } catch (err) {
       console.error('Failed to fetch audit logs:', err);
     }
@@ -721,7 +782,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       try {
         const remoteSessionId = await fetchDbValue(`active_session_${username.trim().toLowerCase()}`);
         if (remoteSessionId) {
-          if (remoteSessionId !== localSessionId) {
+          if (remoteSessionId === 'terminated') {
+            console.warn('[SECURITY] Session terminated by administrator.');
+            setSessionTerminationReason('terminated');
+            logout();
+          } else if (remoteSessionId !== localSessionId) {
             console.warn('[SECURITY] Multi-device login detected. Logging out of this session.');
             setSessionTerminationReason('new-login');
             logout();
@@ -737,9 +802,211 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return () => clearInterval(checkInterval);
   }, [isAuthenticated]);
 
-  const incidents = useMemo(() => MOCK_INCIDENTS, []);
-  const offenders = useMemo(() => MOCK_OFFENDERS, []);
   const anomalies = useMemo(() => MOCK_ANOMALIES, []);
+
+  useEffect(() => {
+    const loadDynamicData = async () => {
+      try {
+        const res = await fetch('/api/incidents');
+        if (!res.ok) throw new Error(`HTTP error: ${res.status}`);
+        const result = await res.json();
+        if (result.success && Array.isArray(result.records)) {
+          if (result.records.length === 0) {
+            console.log('[SUPABASE] Database is empty. Seeding might be required.');
+            return;
+          }
+          
+          const adapted = result.records.map(adaptSupabaseRecord).filter(Boolean);
+          setRawIncidents(adapted);
+          console.log(`[SUPABASE] Loaded ${adapted.length} incidents dynamically from Supabase.`);
+        }
+      } catch (err) {
+        console.error('[SUPABASE] Failed to load data:', err);
+      }
+    };
+
+    loadDynamicData();
+
+    // Subscribe to real-time database changes
+    const channel = supabase
+      .channel('schema-db-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // INSERT, UPDATE, DELETE
+          schema: 'public',
+          table: 'fir_records',
+        },
+        (payload) => {
+          console.log('[SUPABASE REALTIME] Change received:', payload);
+          
+          if (payload.eventType === 'INSERT') {
+            const newAdapted = adaptSupabaseRecord(payload.new);
+            if (newAdapted) {
+              setRawIncidents(prev => {
+                if (prev.some(item => item.case_information.unique_id === newAdapted.case_information.unique_id)) {
+                  return prev;
+                }
+                return [newAdapted, ...prev];
+              });
+            }
+          } else if (payload.eventType === 'UPDATE') {
+            const updatedAdapted = adaptSupabaseRecord(payload.new);
+            if (updatedAdapted) {
+              setRawIncidents(prev => prev.map(item => 
+                item.case_information.unique_id === updatedAdapted.case_information.unique_id
+                  ? updatedAdapted
+                  : item
+              ));
+            }
+          } else if (payload.eventType === 'DELETE') {
+            const deletedId = payload.old.id;
+            if (deletedId) {
+              setRawIncidents(prev => prev.filter(item => item.db_id !== deletedId));
+            }
+          }
+        }
+      )
+      .subscribe((status, err) => {
+        console.log(`[SUPABASE REALTIME] Subscription status: ${status}`, err || '');
+      });
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  const reportIncident = async (newRecord: any, formattedIncident: Incident, newOffender?: Offender): Promise<string | null> => {
+    try {
+      const res = await fetch('/api/incident/report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newRecord)
+      });
+      if (!res.ok) {
+        throw new Error(`Failed to report incident: ${res.status}`);
+      }
+      const data = await res.json();
+      if (data.success && data.record) {
+        const generatedId = data.unique_id;
+        
+        // Adapt and append the newly created record to our raw state
+        const newAdapted = adaptSupabaseRecord(data.record);
+        if (newAdapted) {
+          setRawIncidents(prev => [newAdapted, ...prev]);
+        }
+        return generatedId;
+      }
+      return null;
+    } catch (err) {
+      console.error('Error reporting incident:', err);
+      return null;
+    }
+  };
+
+  const verifyCredentials = async (username: string, password: string): Promise<{ valid: boolean; name: string; username: string }> => {
+    const cleanUsername = username.trim().toLowerCase();
+    try {
+      const { normal, admin } = await fetchUsers();
+      const normalUser = normal.find((u: any) => u.username.trim().toLowerCase() === cleanUsername);
+      const adminUser = admin.find((u: any) => u.username.trim().toLowerCase() === cleanUsername);
+
+      if (normalUser && normalUser.password === password) {
+        return { valid: true, name: normalUser.name || normalUser.username, username: normalUser.username };
+      }
+      if (adminUser && adminUser.password === password) {
+        return { valid: true, name: adminUser.name || adminUser.username, username: adminUser.username };
+      }
+    } catch (err) {
+      console.error('Error verifying credentials:', err);
+    }
+    return { valid: false, name: '', username: '' };
+  };
+
+  const mapRawStatusToAppStatus = (rawStatus: string): 'Open' | 'Dispatched' | 'Resolved' => {
+    switch (rawStatus) {
+      case 'Closed': return 'Resolved';
+      case 'Charge Sheet Filed': return 'Dispatched';
+      case 'Transferred': return 'Dispatched';
+      case 'Under Investigation': return 'Open';
+      case 'Open':
+      default: return 'Open';
+    }
+  };
+
+  const updateIncidentStatus = async (
+    incidentId: string,
+    newRawStatus: string,
+    remarks: string,
+    modifiedBy: string,
+    modifiedByUserId: string,
+    closureDetails?: any,
+    chargeSheetFiled?: boolean
+  ) => {
+    try {
+      const res = await fetch(`/api/incidents/${encodeURIComponent(incidentId)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          case_status: newRawStatus,
+          remarks,
+          modifiedBy,
+          modifiedByUserId,
+          closureDetails,
+          chargeSheetFiled,
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error(`Failed to update status: ${res.status}`);
+      }
+
+      const result = await res.json();
+      if (!result.success) {
+        throw new Error(result.error || 'Server rejected status update');
+      }
+
+      // 1. Update React state (rawIncidents)
+      setRawIncidents(prev => prev.map(item => {
+        if (item.case_information.unique_id !== incidentId) return item;
+        
+        return {
+          ...item,
+          case_status: newRawStatus,
+          legal_outcome: {
+            ...item.legal_outcome,
+            charge_sheet_filed: chargeSheetFiled !== undefined ? chargeSheetFiled : (item.legal_outcome?.charge_sheet_filed || false),
+            conviction_status: newRawStatus
+          },
+          status_modification: {
+            previousStatus: item.case_status || 'Open',
+            newStatus: newRawStatus,
+            remarks,
+            modifiedAt: new Date().toISOString(),
+            modifiedBy,
+            modifiedByUserId,
+            closureDetails: closureDetails || undefined,
+          }
+        };
+      }));
+
+      // 2. Update rawCrimeData in-place for generated PDF correctness
+      const caseData = rawCrimeData.find((item: any) => item.case_information.unique_id === incidentId);
+      if (caseData) {
+        if (!caseData.legal_outcome) {
+          caseData.legal_outcome = {};
+        }
+        if (chargeSheetFiled !== undefined) {
+          caseData.legal_outcome.charge_sheet_filed = chargeSheetFiled;
+        }
+        caseData.legal_outcome.conviction_status = newRawStatus;
+      }
+      console.log(`[SUPABASE] Updated incident status: ${incidentId} -> ${newRawStatus}`);
+    } catch (err) {
+      console.error('[SUPABASE] Failed to update incident status:', err);
+    }
+  };
+
 
   // Compute filtered incidents dynamically
   const filteredIncidents = useMemo(() => {
@@ -926,6 +1193,45 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return { success: false, message: 'User record not found' };
   };
 
+  const terminateSession = async (targetUsername: string): Promise<boolean> => {
+    if (!currentUser || !currentUser.isAdmin || currentUser.level !== 2) {
+      console.warn('Unauthorized session termination attempt.');
+      return false;
+    }
+
+    const cleanTarget = targetUsername.trim().toLowerCase();
+    const cleanSelf = currentUser.username.trim().toLowerCase();
+
+    if (cleanTarget === cleanSelf) {
+      console.warn('Cannot terminate own session.');
+      return false;
+    }
+
+    const { normal, admin } = await fetchUsers();
+    
+    const targetNormal = normal.find(u => u.username.toLowerCase() === cleanTarget);
+    const targetAdmin = admin.find(u => u.username.toLowerCase() === cleanTarget);
+
+    if (!targetNormal && !targetAdmin) {
+      console.warn('Target user not found.');
+      return false;
+    }
+
+    // Level 2 admins cannot logout other Level 2 admins
+    if (targetAdmin && targetAdmin.level === 2) {
+      console.warn('Unauthorized: Cannot log out a Level 2 Admin.');
+      return false;
+    }
+
+    try {
+      await updateDbValue(`active_session_${cleanTarget}`, 'terminated');
+      return true;
+    } catch (e) {
+      console.error('Failed to terminate remote session:', e);
+      return false;
+    }
+  };
+
   return (
     <AppContext.Provider
       value={{
@@ -964,7 +1270,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
         createUser,
         deleteUser,
         updateProfile,
-        changePassword
+        changePassword,
+        terminateSession,
+        reportIncident,
+        verifyCredentials,
+        updateIncidentStatus,
+        syndicateLinks,
+        syndicateClusters,
+        centralityMap,
+        selectedSyndicateId,
+        setSelectedSyndicateId,
+        linkStrengthFilter,
+        setLinkStrengthFilter,
+        activeSignalFilters,
+        setActiveSignalFilters,
+        highlightedNodeId,
+        setHighlightedNodeId,
       }}
     >
       {children}

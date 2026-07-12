@@ -7,7 +7,7 @@ import GlassPanel from './GlassPanel';
 import { User, Activity, AlertTriangle, Calendar, X } from 'lucide-react';
 
 export default function OffenderDrawer() {
-  const { selectedOffenderId, setSelectedOffenderId, offenders } = useApp();
+  const { selectedOffenderId, setSelectedOffenderId, offenders, syndicateClusters, centralityMap } = useApp();
 
   const offender = offenders.find(o => o.id === selectedOffenderId);
 
@@ -65,7 +65,7 @@ export default function OffenderDrawer() {
               <span className="drawer-name">{offender.name}</span>
               <span className="offender-alias-badge">ALIAS: {offender.alias}</span>
               <span style={{ fontSize: '0.75rem', color: 'var(--text-dark)', marginTop: '0.2rem' }}>
-                Age: {offender.age} | System Status: <StatusBadge status={offender.status} />
+                Age: {offender.age} | Gender: {offender.gender || 'Unknown'} | System Status: <StatusBadge status={offender.status} />
               </span>
             </div>
           </div>
@@ -100,6 +100,49 @@ export default function OffenderDrawer() {
               {offender.bio}
             </p>
           </div>
+
+          {/* Syndicate Membership */}
+          {(() => {
+            const cluster = syndicateClusters.find(c => c.members.includes(offender.id) && c.members.length > 1);
+            const centrality = centralityMap.get(offender.id);
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                <span className="dossier-label">Syndicate Intelligence</span>
+                {cluster ? (
+                  <div style={{
+                    padding: '0.6rem 0.8rem',
+                    borderRadius: '8px',
+                    background: `${cluster.color}10`,
+                    border: `1px solid ${cluster.color}30`,
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.3rem' }}>
+                      <span style={{
+                        width: '10px', height: '10px', borderRadius: '50%',
+                        backgroundColor: cluster.color,
+                      }} />
+                      <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: cluster.color }}>
+                        {cluster.name}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                      <span>ID: {cluster.id} · {cluster.members.length} members · Avg Risk: {cluster.avgRiskScore}%</span>
+                      <span>Primary MO: {cluster.primaryCrimeType} · Region: {cluster.geographicFocus}</span>
+                      {centrality && (
+                        <span>Degree Centrality: {centrality.degree} · Betweenness: {centrality.betweenness.toFixed(1)}</span>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-dark)', fontStyle: 'italic' }}>
+                    No active syndicate affiliation detected. Classified as isolated node.
+                    {centrality && centrality.degree > 0 && (
+                      <> (Degree: {centrality.degree})</>  
+                    )}
+                  </span>
+                )}
+              </div>
+            );
+          })()}
 
           {/* Syndicate Connections */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>

@@ -19,16 +19,16 @@ ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip, Legend);
 
 export default function PredictionArea() {
   const { resolvedTheme } = useApp();
-  // Slider states (Defaulting to East Delhi Border D2 baseline values)
-  const [unemployment, setUnemployment] = useState<number>(9.8);
-  const [lighting, setLighting] = useState<number>(48);
+  // Slider states (Defaulting to Dakshina Kannada baseline values)
+  const [unemployment, setUnemployment] = useState<number>(11.7);
+  const [lighting, setLighting] = useState<number>(62);
   const [patrol, setPatrol] = useState<number>(4);
-  const [income, setIncome] = useState<number>(35); // In k INR
+  const [income, setIncome] = useState<number>(73); // In k INR
 
   // Simulation running states
   const [isSimulating, setIsSimulating] = useState<boolean>(false);
   const [terminalLogs, setTerminalLogs] = useState<string[]>([]);
-  const [predictedRate, setPredictedRate] = useState<number>(58.2);
+  const [predictedRate, setPredictedRate] = useState<number>(46.0);
   const terminalEndRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll terminal logs
@@ -43,7 +43,7 @@ export default function PredictionArea() {
 
     const logSequence = [
       { text: "[INITIALIZING] Accessing socio-economic weight vectors...", delay: 100 },
-      { text: "[TELEMETRY] Sector D2 (East Delhi Border) selected as baseline.", delay: 350 },
+      { text: "[TELEMETRY] Sector Dakshina Kannada (KA_dakshina_kannada) selected as baseline.", delay: 350 },
       { text: "[REGRESSION] Coefficients: Unemployment=+2.1 | Lighting=-0.4 | Patrol=-3.2 | Income=-0.15", delay: 700 },
       { text: `[COMPILING] Modeling variables: U=${unemployment}%, L=${lighting}%, P=${patrol}/10, I=₹${income}k...`, delay: 1050 },
       { text: "[PROCESSING] Running multivariate regression matrix computation...", delay: 1400 }
@@ -57,19 +57,19 @@ export default function PredictionArea() {
 
     // Final calculation log
     setTimeout(() => {
-      // Regression Formula centered on East Delhi baseline
-      // Base crime rate = 58.2
-      const baseUnemployment = 9.8;
-      const baseLighting = 48;
+      // Regression Formula centered on Dakshina Kannada baseline
+      // Base crime rate = 46.0
+      const baseUnemployment = 11.7;
+      const baseLighting = 62;
       const basePatrol = 4;
-      const baseIncome = 35;
+      const baseIncome = 73;
 
       const deltaU = (unemployment - baseUnemployment) * 2.1;
       const deltaL = (lighting - baseLighting) * -0.4;
       const deltaP = (patrol - basePatrol) * -3.2;
       const deltaI = (income - baseIncome) * -0.15;
 
-      const rawCalculated = 58.2 + deltaU + deltaL + deltaP + deltaI;
+      const rawCalculated = 46.0 + deltaU + deltaL + deltaP + deltaI;
       const finalVal = parseFloat(Math.max(5.0, rawCalculated).toFixed(1));
       
       setPredictedRate(finalVal);
@@ -81,12 +81,12 @@ export default function PredictionArea() {
   };
 
   const handleResetVariables = () => {
-    setUnemployment(9.8);
-    setLighting(48);
+    setUnemployment(11.7);
+    setLighting(62);
     setPatrol(4);
-    setIncome(35);
-    setPredictedRate(58.2);
-    setTerminalLogs(["[RESET] Variables returned to Sector D2 default baseline values."]);
+    setIncome(73);
+    setPredictedRate(46.0);
+    setTerminalLogs(["[RESET] Variables returned to Dakshina Kannada default baseline values."]);
   };
 
   // Determine threat level badge and color
@@ -101,18 +101,18 @@ export default function PredictionArea() {
 
   // Chart configuration for comparison
   const comparisonData = {
-    labels: ['Current Baseline Rate (Sector D2)', 'AI Simulated Forecast'],
+    labels: ['Current Baseline Rate (Dakshina Kannada)', 'AI Simulated Forecast'],
     datasets: [
       {
         label: 'Crime Rate per 100k Population',
-        data: [58.2, predictedRate],
+        data: [46.0, predictedRate],
         backgroundColor: [
           'rgba(59, 130, 246, 0.25)', // Baseline (Blue)
-          predictedRate > 58.2 ? 'rgba(239, 68, 68, 0.25)' : 'rgba(16, 185, 129, 0.25)' // Simulated (Red/Green)
+          predictedRate > 46.0 ? 'rgba(239, 68, 68, 0.25)' : 'rgba(16, 185, 129, 0.25)' // Simulated (Red/Green)
         ],
         borderColor: [
           'var(--color-blue)',
-          predictedRate > 58.2 ? 'var(--color-red)' : 'var(--color-success)'
+          predictedRate > 46.0 ? 'var(--color-red)' : 'var(--color-success)'
         ],
         borderWidth: 2,
         borderRadius: 6

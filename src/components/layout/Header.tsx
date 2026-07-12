@@ -60,10 +60,15 @@ export default function Header() {
           title: 'Operator Profile',
           subtitle: 'Manage Command Station credentials and tactical profile configuration'
         };
+      case 'report':
+        return {
+          title: 'Report Incident',
+          subtitle: 'Create a new First Information Report (FIR) and persist it to the K-NETRA database'
+        };
       default:
         return {
           title: 'Command Center',
-          subtitle: 'AETHER Command and Control console'
+          subtitle: 'K-NETRA Command and Control console'
         };
     }
   };
@@ -94,8 +99,8 @@ export default function Header() {
         </div>
       </div>
 
-      {/* Global Command Console Filters - hide for predictor and profile views */}
-      {currentView !== 'predictor' && currentView !== 'profile' && (
+      {/* Global Command Console Filters - hide for predictor, profile and report views */}
+      {currentView !== 'predictor' && currentView !== 'profile' && currentView !== 'report' && (
         <div className="console-filters">
           <div className="filter-input-wrap">
             <Search className="filter-icon" size={14} />
