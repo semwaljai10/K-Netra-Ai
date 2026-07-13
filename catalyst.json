@@ -3,9 +3,10 @@
     "name": "K-Netra-Ai",
     "id": "47854000000050015"
   },
-  "appsail": {
-    "k-netra-app": {
+  "appsail": [
+    {
+      "name": "k-netra-app",
       "source": "."
     }
-  }
+  ]
 }
