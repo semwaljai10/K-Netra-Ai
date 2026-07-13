@@ -6,7 +6,17 @@
   "appsail": [
     {
       "name": "k-netra-app",
-      "source": "."
+      "source": ".",
+      "ignore": [
+        "node_modules/**",
+        ".next/cache/**",
+        "src/**",
+        ".git/**",
+        "supabase/**",
+        ".venv_old/**",
+        "package-lock.json",
+        ".env.local"
+      ]
     }
   ]
 }
