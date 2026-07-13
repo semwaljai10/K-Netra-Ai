@@ -116,23 +116,33 @@ const fromUrlSafeBase64 = (base64: string) => {
 };
 
 const fetchDbValue = async (key: string): Promise<string> => {
-  const res = await fetch('/api/db', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ action: 'get', key })
-  });
-  if (!res.ok) {
-    throw new Error(`Failed to fetch key "${key}" from proxy: ${res.status}`);
+  try {
+    const res = await fetch('/api/db', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'get', key })
+    });
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status} ${res.statusText}`);
+    }
+    const text = await res.text();
+    try {
+      const json = JSON.parse(text);
+      if (json.error) {
+        throw new Error(`Server returned error: ${json.error}`);
+      }
+      const val = json.data || '';
+      if (val === 'Value Not Found' || val === 'Not Found' || val.includes('error')) {
+        return '';
+      }
+      return val;
+    } catch (parseErr) {
+      const snippet = text.substring(0, 80).replace(/\s+/g, ' ');
+      throw new Error(`Invalid JSON: "${snippet}"`);
+    }
+  } catch (err: any) {
+    throw new Error(`fetchDbValue('${key}') failed: ${err.message || err}`);
   }
-  const json = await res.json();
-  if (json.error) {
-    throw new Error(`Failed to fetch key "${key}" from proxy: ${json.error}`);
-  }
-  const val = json.data || '';
-  if (val === 'Value Not Found' || val === 'Not Found' || val.includes('error')) {
-    return '';
-  }
-  return val;
 };
 
 const updateDbValue = async (key: string, value: string): Promise<boolean> => {

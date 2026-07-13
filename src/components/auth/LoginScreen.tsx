@@ -69,9 +69,9 @@ export default function LoginScreen() {
       } else {
         setTelemetry('DECRYPT COMPLETE: ACCESS GRANTED');
       }
-    } catch (err) {
+    } catch (err: any) {
       clearInterval(interval);
-      setError('Telemetry Failure: Gateway unreachable.');
+      setError(`Telemetry Failure: ${err.message || err}`);
       setTelemetry('NETWORK LINK TIMEOUT');
       setLoading(false);
     }
