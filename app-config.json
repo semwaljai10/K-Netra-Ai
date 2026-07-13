@@ -1,0 +1,9 @@
+{
+  "command": "node server.js",
+  "stack": "node20",
+  "memory": 512,
+  "platform": "nodejs",
+  "env_variables": {
+    "NEXT_PUBLIC_SUPABASE_URL": "https://wsxvfnpoygeujdiglshb.supabase.co"
+  }
+}
