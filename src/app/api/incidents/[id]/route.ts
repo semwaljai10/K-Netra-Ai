@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase, isSupabaseConfigured } from '@/lib/supabase';
+import { supabase, isSupabaseConfigured, withTimeout } from '@/lib/supabase';
 
 /**
  * PATCH /api/incidents/[id] — Update an incident's status in Supabase.
@@ -41,12 +41,15 @@ export async function PATCH(
       chargeSheetFiled: chargeSheetFiled || false,
     };
 
-    // Get current record to capture previous status and update JSONB data
-    const { data: currentRecord, error: fetchError } = await supabase
-      .from('fir_records')
-      .select('case_status, data')
-      .eq('fir_number', id)
-      .single();
+    // Get current record to capture previous status and update JSONB data (wrapped in timeout)
+    const { data: currentRecord, error: fetchError } = await withTimeout(
+      supabase
+        .from('fir_records')
+        .select('case_status, data')
+        .eq('fir_number', id)
+        .single(),
+      2500
+    );
 
     if (fetchError) {
       console.error('Fetch for update error:', fetchError);
@@ -68,17 +71,20 @@ export async function PATCH(
       return 'Low';
     };
 
-    const { data, error: updateError } = await supabase
-      .from('fir_records')
-      .update({
-        case_status,
-        severity: getSeverity(crimeType),
-        data: updatedData,
-        status_modification: statusMod,
-      })
-      .eq('fir_number', id)
-      .select()
-      .single();
+    const { data, error: updateError } = await withTimeout(
+      supabase
+        .from('fir_records')
+        .update({
+          case_status,
+          severity: getSeverity(crimeType),
+          data: updatedData,
+          status_modification: statusMod,
+        })
+        .eq('fir_number', id)
+        .select()
+        .single(),
+      2500
+    );
 
     if (updateError) {
       console.error('Supabase update error:', updateError);
@@ -109,11 +115,14 @@ export async function GET(
 
     const { id } = await params;
 
-    const { data, error } = await supabase
-      .from('fir_records')
-      .select('*')
-      .eq('fir_number', id)
-      .single();
+    const { data, error } = await withTimeout(
+      supabase
+        .from('fir_records')
+        .select('*')
+        .eq('fir_number', id)
+        .single(),
+      2500
+    );
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 404 });

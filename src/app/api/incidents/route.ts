@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase, isSupabaseConfigured } from '@/lib/supabase';
+import { supabase, isSupabaseConfigured, withTimeout } from '@/lib/supabase';
 
 /**
  * GET /api/incidents — Fetch all incidents from Supabase.
@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
       query = query.eq('crime_type', crimeType);
     }
 
-    const { data, error } = await query;
+    const { data, error } = await withTimeout(query, 2500);
 
     if (error) {
       console.error('Supabase fetch error:', error);

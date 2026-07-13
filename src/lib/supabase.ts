@@ -23,3 +23,12 @@ export const supabase = createClient(
   supabaseUrl || 'https://placeholder-url-for-build.supabase.co',
   supabaseAnonKey || 'placeholder-key'
 );
+
+export const withTimeout = <T = any>(promise: any, timeoutMs: number = 3000): Promise<T> => {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error('Database query timed out')), timeoutMs)
+    ),
+  ]);
+};

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { supabase, isSupabaseConfigured } from '@/lib/supabase';
+import { supabase, isSupabaseConfigured, withTimeout } from '@/lib/supabase';
 
 export async function POST(request: Request) {
   try {
@@ -15,14 +15,17 @@ export async function POST(request: Request) {
       let supabaseValue = '';
       let fetchSuccess = false;
 
-      // 1. Try to fetch from Supabase if configured
+      // 1. Try to fetch from Supabase if configured (wrapped in 2.5s timeout)
       if (isSupabaseConfigured()) {
         try {
-          const { data, error } = await supabase
-            .from('session_store')
-            .select('value')
-            .eq('key', key)
-            .single();
+          const { data, error } = await withTimeout(
+            supabase
+              .from('session_store')
+              .select('value')
+              .eq('key', key)
+              .single(),
+            2500
+          );
 
           if (!error && data) {
             supabaseValue = data.value;
@@ -55,9 +58,12 @@ export async function POST(request: Request) {
               if (isSupabaseConfigured()) {
                 (async () => {
                   try {
-                    const { error } = await supabase
-                      .from('session_store')
-                      .upsert({ key, value: data, updated_at: new Date().toISOString() });
+                    const { error } = await withTimeout(
+                      supabase
+                        .from('session_store')
+                        .upsert({ key, value: data, updated_at: new Date().toISOString() }),
+                      2500
+                    );
                     if (error) {
                       console.warn(`[SUPABASE] Auto-migration caching failed for key "${key}":`, error.message);
                     } else {
@@ -79,12 +85,15 @@ export async function POST(request: Request) {
     } else if (action === 'update') {
       let success = false;
 
-      // 1. Update in Supabase if configured
+      // 1. Update in Supabase if configured (wrapped in 2.5s timeout)
       if (isSupabaseConfigured()) {
         try {
-          const { error } = await supabase
-            .from('session_store')
-            .upsert({ key, value: String(value), updated_at: new Date().toISOString() });
+          const { error } = await withTimeout(
+            supabase
+              .from('session_store')
+              .upsert({ key, value: String(value), updated_at: new Date().toISOString() }),
+            2500
+          );
 
           if (!error) {
             success = true;
