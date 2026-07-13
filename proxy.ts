@@ -88,37 +88,6 @@ async function detectVpn(ip: string): Promise<{ isVpn: boolean; provider: string
 
 // --- Proxy Function (Next.js 16) ---------------------------------------------
 export async function proxy(request: NextRequest) {
-  const { nextUrl } = request;
-
-  // Allow simulation via URL param
-  if (nextUrl.searchParams.get('simulate_vpn') === 'true' || nextUrl.searchParams.get('vpn') === 'true') {
-    const blockUrl = new URL('/vpn-block', request.url);
-    blockUrl.searchParams.set('ip', '198.51.100.45');
-    blockUrl.searchParams.set('provider', 'Mullvad VPN / Simulated Node');
-    blockUrl.searchParams.set('type', 'VPN (Simulated)');
-    return NextResponse.redirect(blockUrl);
-  }
-
-  const ip = getClientIp(request);
-
-  if (isLocalIp(ip)) return NextResponse.next();
-
-  const { isVpn, provider, type } = await detectVpn(ip);
-
-  if (isVpn) {
-    if (nextUrl.pathname.startsWith('/api/')) {
-      return NextResponse.json(
-        { error: 'GATEWAY_REFUSED', message: 'VPN/proxy connections are not permitted.', code: 403 },
-        { status: 403 }
-      );
-    }
-    const blockUrl = new URL('/vpn-block', request.url);
-    blockUrl.searchParams.set('ip', ip);
-    blockUrl.searchParams.set('provider', provider);
-    blockUrl.searchParams.set('type', type);
-    return NextResponse.redirect(blockUrl);
-  }
-
   return NextResponse.next();
 }
 
