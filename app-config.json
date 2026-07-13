@@ -3,6 +3,7 @@
   "stack": "node20",
   "memory": 512,
   "platform": "nodejs",
+  "buildPath": ".",
   "env_variables": {
     "NEXT_PUBLIC_SUPABASE_URL": "https://wsxvfnpoygeujdiglshb.supabase.co",
     "NEXT_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndzeHZmbnBveWdldWpkaWdsc2hiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM2MTg3MzQsImV4cCI6MjA5OTE5NDczNH0.SepsaTvlqFTZP_ESUjuOWwOpftYJxodR37h_K3L5tDU"
