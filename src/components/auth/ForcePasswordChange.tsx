@@ -133,16 +133,16 @@ export default function ForcePasswordChange() {
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
-            <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: '500' }}>Temporary 8-Digit OTP</label>
+            <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: '500' }}>Temporary 6-Digit OTP</label>
             <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
               <Key size={14} style={{ position: 'absolute', left: '0.75rem', color: 'var(--text-dark)' }} />
               <input 
                 type="text" 
                 value={otp}
                 onChange={e => setOtp(e.target.value)}
-                placeholder="Enter temporary OTP code"
+                placeholder="Enter 6-digit OTP code"
                 required
-                maxLength={8}
+                maxLength={6}
                 style={{
                   background: 'rgba(0,0,0,0.3)',
                   border: '1px solid rgba(255,255,255,0.08)',

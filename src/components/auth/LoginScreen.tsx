@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '@/context/AppContext';
-import { ShieldAlert, Lock, User, Terminal, ArrowRight, Eye, EyeOff } from 'lucide-react';
+import { ShieldAlert, Lock, User, ArrowRight, Eye, EyeOff } from 'lucide-react';
 
 export default function LoginScreen() {
   const { login, sessionTerminationReason, setSessionTerminationReason } = useApp();
@@ -88,7 +88,7 @@ export default function LoginScreen() {
         {/* Floating cyber header */}
         <div className="login-header">
           <div className="login-logo">
-            <Terminal size={24} />
+            <img src="/k-netra-logo-transparent.png" alt="K-Netra Logo" />
           </div>
           <h1>K-NETRA COMMAND</h1>
           <p>{telemetry}</p>

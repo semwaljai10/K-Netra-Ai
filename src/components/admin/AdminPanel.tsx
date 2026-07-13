@@ -3,14 +3,14 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useApp } from '@/context/AppContext';
 import GlassPanel from '../ui/GlassPanel';
-import { 
-  ShieldAlert, 
-  RefreshCw, 
-  Terminal, 
-  Globe, 
-  Calendar, 
-  Monitor, 
-  Cpu, 
+import {
+  ShieldAlert,
+  RefreshCw,
+  Terminal,
+  Globe,
+  Calendar,
+  Monitor,
+  Cpu,
   Lock,
   User,
   PlusCircle,
@@ -55,6 +55,7 @@ export default function AdminPanel() {
   const [name, setName] = useState('');
   const [role, setRole] = useState('');
   const [password, setPassword] = useState('');
+  const [phone, setPhone] = useState('');
   const [userType, setUserType] = useState<'normal' | 'admin'>('normal');
   const [adminLevel, setAdminLevel] = useState<number>(1);
   const [creating, setCreating] = useState(false);
@@ -133,15 +134,23 @@ export default function AdminPanel() {
 
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !role.trim()) {
+    if (!name.trim() || !role.trim() || !phone.trim()) {
       setErrorMsg('All fields are required.');
       return;
     }
+
+    const phoneDigits = phone.trim();
+    const phoneRegex = /^[6-9]\d{9}$/;
+    if (!phoneRegex.test(phoneDigits)) {
+      setErrorMsg('Mobile number must be a valid 10-digit Indian number starting with 6, 7, 8, or 9.');
+      return;
+    }
+
     setCreating(true);
     setErrorMsg(null);
     try {
       const res = await createUser(
-        { name, role },
+        { name, role, phone: `+91${phoneDigits}` },
         userType,
         userType === 'admin' ? adminLevel : undefined
       );
@@ -174,7 +183,7 @@ export default function AdminPanel() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-      
+
       {/* 1. Admin Telemetry Metrics */}
       <div className="metrics-grid">
         <GlassPanel className="metric-card">
@@ -233,9 +242,9 @@ export default function AdminPanel() {
                 <GlassPanel key={idx} style={{ padding: '1rem', margin: 0, border: '1px solid rgba(255,255,255,0.05)', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                      <span style={{ 
-                        fontSize: '0.6rem', 
-                        padding: '0.1rem 0.35rem', 
+                      <span style={{
+                        fontSize: '0.6rem',
+                        padding: '0.1rem 0.35rem',
                         borderRadius: '4px',
                         background: opIsAdmin ? 'rgba(168, 85, 247, 0.12)' : 'rgba(59, 130, 246, 0.12)',
                         border: opIsAdmin ? '1px solid rgba(168, 85, 247, 0.25)' : '1px solid rgba(59, 130, 246, 0.25)',
@@ -246,24 +255,24 @@ export default function AdminPanel() {
                       </span>
                       <strong style={{ color: 'var(--text-primary)', fontSize: '0.9rem' }}>{op.name}</strong>
                     </div>
-                    <span style={{ 
-                      width: '8px', 
-                      height: '8px', 
-                      borderRadius: '50%', 
+                    <span style={{
+                      width: '8px',
+                      height: '8px',
+                      borderRadius: '50%',
                       background: hasLog ? 'var(--color-success)' : 'var(--text-dark)',
                       boxShadow: hasLog ? '0 0 8px var(--color-success)' : 'none'
                     }} />
                   </div>
-                  
+
                   <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'var(--font-family-mono)' }}>
                     ID: <span style={{ color: 'var(--text-primary)' }}>{op.username}</span>
                   </div>
                   <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                     Role: <span style={{ color: 'var(--text-primary)' }}>{op.role}</span>
                   </div>
-                  
+
                   <hr style={{ border: 'none', borderBottom: '1px solid rgba(255, 255, 255, 0.05)', margin: '0.4rem 0' }} />
-                  
+
                   {op.lastLog ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', fontSize: '0.7rem' }}>
                       <div style={{ color: 'var(--text-muted)' }}>
@@ -291,7 +300,7 @@ export default function AdminPanel() {
       {/* 3. Operator Management (Level 2 Admins Only) */}
       {currentUser?.level === 2 && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.5rem' }}>
-          
+
           {/* Operator Directory Table */}
           <GlassPanel className="panel-table" style={{ margin: 0, padding: '1.25rem' }}>
             <div className="panel-header-row" style={{ paddingBottom: '0.75rem', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
@@ -300,7 +309,7 @@ export default function AdminPanel() {
                 Operator Directory
               </h2>
             </div>
-            
+
             <div className="table-container" style={{ padding: '0.75rem 0', maxHeight: '360px', overflowY: 'auto' }}>
               {usersLoading ? (
                 <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-dark)' }}>
@@ -328,7 +337,7 @@ export default function AdminPanel() {
                           </td>
                           <td style={{ padding: '0.6rem 0.25rem', fontSize: '0.8rem' }}>
                             <div style={{ fontWeight: '500', color: 'var(--text-primary)' }}>{user.name}</div>
-                            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{user.role}</div>
+                            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{user.role}{user.phone ? ` | ${user.phone}` : ''}</div>
                           </td>
                           <td style={{ padding: '0.6rem 0.25rem' }}>
                             <span style={{
@@ -372,7 +381,7 @@ export default function AdminPanel() {
                         </td>
                         <td style={{ padding: '0.6rem 0.25rem', fontSize: '0.8rem' }}>
                           <div style={{ fontWeight: '500', color: 'var(--text-primary)' }}>{user.name}</div>
-                          <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{user.role}</div>
+                          <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{user.role}{user.phone ? ` | ${user.phone}` : ''}</div>
                         </td>
                         <td style={{ padding: '0.6rem 0.25rem' }}>
                           <span style={{
@@ -418,7 +427,7 @@ export default function AdminPanel() {
               <PlusCircle size={16} style={{ color: 'var(--color-success)' }} />
               Provision New operator
             </h2>
-            
+
             {errorMsg && (
               <div style={{
                 background: 'rgba(239, 68, 68, 0.08)',
@@ -435,10 +444,10 @@ export default function AdminPanel() {
             <form onSubmit={handleCreateUser} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                 <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: '500' }}>Operator Name</label>
-                <input 
-                  type="text" 
-                  value={name} 
-                  onChange={e => setName(e.target.value)} 
+                <input
+                  type="text"
+                  value={name}
+                  onChange={e => setName(e.target.value)}
                   placeholder="e.g. Officer R. Malhotra"
                   required
                   style={{
@@ -453,13 +462,47 @@ export default function AdminPanel() {
                 />
               </div>
 
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: '500' }}>Mobile Number</label>
+                <div style={{ display: 'flex', alignItems: 'center' }}>
+                  <span style={{
+                    background: 'rgba(0,0,0,0.35)',
+                    border: '1px solid rgba(255,255,255,0.08)',
+                    borderRight: 'none',
+                    borderRadius: '4px 0 0 4px',
+                    padding: '0.45rem 0.6rem',
+                    fontSize: '0.8rem',
+                    color: 'var(--text-muted)',
+                    userSelect: 'none'
+                  }}>+91</span>
+                  <input
+                    type="tel"
+                    maxLength={10}
+                    value={phone}
+                    onChange={e => setPhone(e.target.value.replace(/\D/g, ''))}
+                    placeholder="9876543210"
+                    required
+                    style={{
+                      background: 'rgba(0,0,0,0.25)',
+                      border: '1px solid rgba(255,255,255,0.08)',
+                      borderRadius: '0 4px 4px 0',
+                      padding: '0.45rem',
+                      color: 'var(--text-primary)',
+                      fontSize: '0.8rem',
+                      outline: 'none',
+                      width: '100px'
+                    }}
+                  />
+                </div>
+              </div>
+
               {/* No password code field - automatically generated OTP */}
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                   <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: '500' }}>Privilege level</label>
-                  <select 
-                    value={userType} 
+                  <select
+                    value={userType}
                     onChange={e => setUserType(e.target.value as 'normal' | 'admin')}
                     style={{
                       background: 'rgba(0,0,0,0.3)',
@@ -479,8 +522,8 @@ export default function AdminPanel() {
                 {userType === 'admin' && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                     <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: '500' }}>Admin Level</label>
-                    <select 
-                      value={adminLevel} 
+                    <select
+                      value={adminLevel}
                       onChange={e => setAdminLevel(Number(e.target.value))}
                       style={{
                         background: 'rgba(0,0,0,0.3)',
@@ -501,9 +544,9 @@ export default function AdminPanel() {
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                 <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: '500' }}>Operational Role</label>
-                <input 
-                  type="text" 
-                  value={role} 
+                <input
+                  type="text"
+                  value={role}
                   disabled
                   required
                   style={{
@@ -519,8 +562,8 @@ export default function AdminPanel() {
                 />
               </div>
 
-              <button 
-                type="submit" 
+              <button
+                type="submit"
                 className="btn btn-primary"
                 disabled={creating}
                 style={{
@@ -559,9 +602,9 @@ export default function AdminPanel() {
             System Logon Access & Security Telemetry
           </h2>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <input 
-              type="text" 
-              placeholder="Search Operator ID..." 
+            <input
+              type="text"
+              placeholder="Search Operator ID..."
               value={logSearchText}
               onChange={e => setLogSearchText(e.target.value)}
               style={{
@@ -575,8 +618,8 @@ export default function AdminPanel() {
                 width: '180px'
               }}
             />
-            <button 
-              className="btn btn-secondary" 
+            <button
+              className="btn btn-secondary"
               style={{ padding: '0.4rem 0.8rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
               onClick={() => loadLogs(logSearchText)}
               disabled={loading}
@@ -613,15 +656,15 @@ export default function AdminPanel() {
                 {logs.map((log, index) => {
                   const isAdmin = log.user.toUpperCase().startsWith('A');
                   const isSelf = log.user.trim().toLowerCase() === currentUser?.username.trim().toLowerCase();
-                  
+
                   // Find the target user object to check their admin level
-                  const targetUserObj = users.admin.find(u => u.username.trim().toLowerCase() === log.user.trim().toLowerCase()) 
-                                     || users.normal.find(u => u.username.trim().toLowerCase() === log.user.trim().toLowerCase());
+                  const targetUserObj = users.admin.find(u => u.username.trim().toLowerCase() === log.user.trim().toLowerCase())
+                    || users.normal.find(u => u.username.trim().toLowerCase() === log.user.trim().toLowerCase());
                   const isL2Admin = targetUserObj && targetUserObj.level === 2;
-                  
+
                   // L2 Admin can terminate normal users or L1 Admin sessions, but not L2 Admins or self
                   const canTerminate = currentUser?.level === 2 && !isSelf && !isL2Admin;
-                  
+
                   return (
                     <tr key={index}>
                       <td style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.4rem', border: 'none', paddingTop: '1.1rem' }}>
@@ -629,10 +672,10 @@ export default function AdminPanel() {
                         {log.time}
                       </td>
                       <td style={{ fontWeight: 'bold', color: isAdmin ? 'var(--color-purple)' : 'var(--color-blue)' }}>
-                        <span style={{ 
-                          fontSize: '0.65rem', 
-                          padding: '0.15rem 0.4rem', 
-                          borderRadius: '4px', 
+                        <span style={{
+                          fontSize: '0.65rem',
+                          padding: '0.15rem 0.4rem',
+                          borderRadius: '4px',
                           marginRight: '0.4rem',
                           background: isAdmin ? 'rgba(168, 85, 247, 0.12)' : 'rgba(59, 130, 246, 0.12)',
                           border: isAdmin ? '1px solid rgba(168, 85, 247, 0.25)' : '1px solid rgba(59, 130, 246, 0.25)'
@@ -711,11 +754,11 @@ export default function AdminPanel() {
               <ShieldCheck size={26} />
               <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 'bold', letterSpacing: '0.5px' }}>Operator Account Provisioned</h2>
             </div>
-            
+
             <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: 0, lineHeight: '1.4' }}>
-              A unique Identification Signature & secure 8-digit temporary OTP have been allocated for the operator:
+              A unique Identification Signature & secure 6-digit access OTP have been allocated and dispatched to the operator's mobile:
             </p>
-            
+
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', margin: '0.25rem 0' }}>
               <div style={{
                 background: 'rgba(59, 130, 246, 0.06)',
@@ -744,16 +787,16 @@ export default function AdminPanel() {
                 letterSpacing: '1px',
                 color: '#34d399'
               }}>
-                <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>Temporary OTP</div>
+                <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>6-Digit OTP</div>
                 {successOtp}
               </div>
             </div>
-            
-            <div style={{ 
-              fontSize: '0.8rem', 
-              color: 'var(--text-muted)', 
-              background: 'rgba(255,255,255,0.02)', 
-              border: '1px solid rgba(255,255,255,0.05)', 
+
+            <div style={{
+              fontSize: '0.8rem',
+              color: 'var(--text-muted)',
+              background: 'rgba(255,255,255,0.02)',
+              border: '1px solid rgba(255,255,255,0.05)',
               borderRadius: '4px',
               padding: '0.75rem',
               display: 'flex',
@@ -761,17 +804,18 @@ export default function AdminPanel() {
               gap: '0.3rem'
             }}>
               <div><strong>Name:</strong> <span style={{ color: 'var(--text-primary)' }}>{name}</span></div>
+              <div><strong>Mobile:</strong> <span style={{ color: 'var(--text-primary)' }}>+91 {phone}</span></div>
               <div><strong>Role:</strong> <span style={{ color: 'var(--text-primary)' }}>{role}</span></div>
               <div><strong>Access:</strong> <span style={{ color: 'var(--text-primary)' }}>{userType === 'admin' ? `Admin (Level ${adminLevel})` : 'Normal Operator'}</span></div>
             </div>
-            
-            <button 
+
+            <button
               className="btn btn-primary"
-              style={{ 
-                background: '#10b981', 
-                border: 'none', 
-                color: '#fff', 
-                padding: '0.6rem', 
+              style={{
+                background: '#10b981',
+                border: 'none',
+                color: '#fff',
+                padding: '0.6rem',
                 marginTop: '0.5rem',
                 fontSize: '0.85rem',
                 fontWeight: 'bold',
@@ -783,6 +827,7 @@ export default function AdminPanel() {
                 setName('');
                 setRole('');
                 setPassword('');
+                setPhone('');
                 setUserType('normal');
                 setAdminLevel(1);
                 loadUsers();
@@ -794,7 +839,7 @@ export default function AdminPanel() {
           </GlassPanel>
         </div>
       )}
-      
+
     </div>
   );
 }

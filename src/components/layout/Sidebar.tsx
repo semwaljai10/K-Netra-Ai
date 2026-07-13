@@ -65,7 +65,7 @@ export default function Sidebar() {
       <div className="sidebar-header">
         <div className="logo-box">
           <div className="logo-icon">
-            <Terminal size={18} />
+            <img src="/k-netra-logo-transparent.png" alt="K-Netra Logo" />
           </div>
           <span className="logo-text">K-NETRA AI</span>
         </div>

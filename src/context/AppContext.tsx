@@ -58,7 +58,7 @@ interface AppContextType {
   } | null;
   fetchAuditLogs: (searchUser?: string) => Promise<any[]>;
   fetchUsers: () => Promise<{ normal: any[]; admin: any[] }>;
-  createUser: (user: { name: string; role: string }, type: 'normal' | 'admin', level?: number) => Promise<{ username: string; otp: string }>;
+  createUser: (user: { name: string; role: string; phone: string }, type: 'normal' | 'admin', level?: number) => Promise<{ username: string; otp: string }>;
   deleteUser: (username: string, type: 'normal' | 'admin') => Promise<boolean>;
   updateProfile: (details: { name: string; role: string; email: string; phone: string; department: string }) => Promise<boolean>;
   changePassword: (oldPassword: string, newPassword: string) => Promise<{ success: boolean; message: string }>;
@@ -244,7 +244,8 @@ const decodeUsers = (encodedStr: string) => {
         mustChangePassword: parts[2] === '1',
         name: parts[3] || '',
         role: parts[4] || '',
-        level: parts[5] ? Number(parts[5]) : undefined
+        level: parts[5] ? Number(parts[5]) : undefined,
+        phone: parts[6] || ''
       };
     }).filter(u => u.username && u.username.trim());
   } catch (err) {
@@ -258,7 +259,7 @@ const encodeUsers = (usersList: any[]) => {
     const delimitedStr = usersList.map(u => {
       const clean = (val: any) => val ? String(val).replace(/[|;]/g, ' ') : '';
       const encPass = encryptPassword(u.password);
-      return `${clean(u.username)}|${encPass}|${u.mustChangePassword ? '1' : '0'}|${clean(u.name)}|${clean(u.role)}|${u.level !== undefined ? u.level : ''}`;
+      return `${clean(u.username)}|${encPass}|${u.mustChangePassword ? '1' : '0'}|${clean(u.name)}|${clean(u.role)}|${u.level !== undefined ? u.level : ''}|${clean(u.phone)}`;
     }).join(';');
     return toUrlSafeBase64(delimitedStr);
   } catch (err) {
@@ -491,7 +492,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   const createUser = async (
-    user: { name: string; role: string },
+    user: { name: string; role: string; phone: string },
     type: 'normal' | 'admin',
     level?: number
   ): Promise<{ username: string; otp: string }> => {
@@ -517,10 +518,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
     }
 
+    // Generate 6-digit numeric OTP
     let otp = '';
-    for (let i = 0; i < 8; i++) {
+    for (let i = 0; i < 6; i++) {
       otp += Math.floor(Math.random() * 10);
     }
+    
+    // Simulate SMS dispatch
+    console.log(`[SMS GATEWAY] Securely dispatched 6-digit access OTP ${otp} to operator number: ${user.phone}`);
     
     if (type === 'admin') {
       const newUser = {
@@ -529,7 +534,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         mustChangePassword: true,
         name: user.name,
         role: user.role,
-        level: level || 1
+        level: level || 1,
+        phone: user.phone
       };
       const updatedAdmins = [...admin, newUser];
       const encoded = encodeUsers(updatedAdmins);
@@ -540,7 +546,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         password: otp,
         mustChangePassword: true,
         name: user.name,
-        role: user.role
+        role: user.role,
+        phone: user.phone
       };
       const updatedNormals = [...normal, newUser];
       const encoded = encodeUsers(updatedNormals);

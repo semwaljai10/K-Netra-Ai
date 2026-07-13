@@ -1,6 +1,126 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 
+interface Suspect {
+  name?: string;
+  age?: number | string | null;
+  gender?: string | null;
+  address?: string | null;
+  contact_phone?: string | null;
+  id_type?: string | null;
+  id_number?: string | null;
+  vehicle_no?: string | null;
+}
+
+function getTimeOfDay(dateStr: string): string {
+  try {
+    const hour = new Date(dateStr).getHours();
+    if (hour >= 6 && hour < 12) return 'Morning';
+    if (hour >= 12 && hour < 17) return 'Afternoon';
+    if (hour >= 17 && hour < 21) return 'Evening';
+    return 'Night';
+  } catch {
+    return 'Unknown';
+  }
+}
+
+function getSeason(dateStr: string): string {
+  try {
+    const month = new Date(dateStr).getMonth();
+    if (month === 11 || month <= 1) return 'Winter';
+    if (month >= 2 && month <= 4) return 'Summer';
+    if (month >= 5 && month <= 8) return 'Monsoon';
+    return 'Post-Monsoon';
+  } catch {
+    return 'Unknown';
+  }
+}
+
+function getCrimeCategory(crimeType: string): string {
+  const t = crimeType.toLowerCase();
+  if (t.includes('theft') || t.includes('robbery') || t.includes('burglary') || t.includes('property') || t.includes('house breaking')) return 'Property';
+  if (t.includes('assault') || t.includes('murder') || t.includes('homicide') || t.includes('kidnap') || t.includes('violence')) return 'Violence';
+  if (t.includes('cyber') || t.includes('online') || t.includes('hacking')) return 'Cyber';
+  if (t.includes('fraud') || t.includes('cheating') || t.includes('financial') || t.includes('forgery')) return 'Financial';
+  if (t.includes('traffic') || t.includes('accident')) return 'Traffic';
+  return 'General';
+}
+
+function isSameSuspect(
+  newSuspect: Suspect,
+  existingSuspect: Suspect,
+  newDistrict: string,
+  existingDistrict: string
+): boolean {
+  if (!newSuspect.name || !existingSuspect.name) return false;
+  
+  const nameA = newSuspect.name.toLowerCase().trim();
+  const nameB = existingSuspect.name.toLowerCase().trim();
+  
+  if (nameA !== nameB) return false;
+  if (nameA === 'unknown' || nameA === 'none' || nameA === '') return false;
+
+  let matchCount = 0;
+  let hasDiffConflict = false;
+
+  // 1. Phone number match
+  const phoneA = newSuspect.contact_phone?.trim();
+  const phoneB = existingSuspect.contact_phone?.trim();
+  if (phoneA && phoneB && phoneA !== 'None' && phoneB !== 'None' && phoneA !== '' && phoneB !== '') {
+    if (phoneA === phoneB) {
+      matchCount += 2;
+    } else {
+      hasDiffConflict = true;
+    }
+  }
+
+  // 2. Government ID match
+  const idTypeA = newSuspect.id_type?.toLowerCase().trim();
+  const idNumA = newSuspect.id_number?.trim();
+  const idTypeB = existingSuspect.id_type?.toLowerCase().trim();
+  const idNumB = existingSuspect.id_number?.trim();
+  if (idTypeA && idNumA && idTypeB && idNumB && idTypeA === idTypeB && idNumA !== '' && idNumB !== '') {
+    if (idNumA === idNumB) {
+      matchCount += 3;
+    } else {
+      hasDiffConflict = true;
+    }
+  }
+
+  // 3. Age match (within 2 years)
+  if (newSuspect.age && existingSuspect.age) {
+    const ageA = Number(newSuspect.age);
+    const ageB = Number(existingSuspect.age);
+    if (!isNaN(ageA) && !isNaN(ageB)) {
+      if (Math.abs(ageA - ageB) <= 2) {
+        matchCount += 1;
+      } else if (Math.abs(ageA - ageB) > 5) {
+        hasDiffConflict = true;
+      }
+    }
+  }
+
+  // 4. District/Location match
+  if (newDistrict && existingDistrict && newDistrict.toLowerCase().trim() === existingDistrict.toLowerCase().trim()) {
+    matchCount += 1;
+  }
+
+  // 5. Vehicle number match
+  const vehA = newSuspect.vehicle_no?.toLowerCase().trim();
+  const vehB = existingSuspect.vehicle_no?.toLowerCase().trim();
+  if (vehA && vehB && vehA !== 'none' && vehB !== 'none' && vehA !== '' && vehB !== '') {
+    if (vehA === vehB) {
+      matchCount += 1.5;
+    }
+  }
+
+  if (hasDiffConflict) {
+    return matchCount >= 3;
+  }
+
+  return matchCount >= 1;
+}
+
 export async function POST(request: Request) {
   try {
     const rawCase = await request.json();
@@ -37,6 +157,59 @@ export async function POST(request: Request) {
       return 'Low';
     };
 
+    // --- Dynamic Identity Resolution & Behavioral Analytics ---
+    const newSuspect = {
+      name: rawCase.suspect_details?.name,
+      age: rawCase.suspect_details?.age ? Number(rawCase.suspect_details.age) : null,
+      contact_phone: rawCase.communication_data?.phone_number || null,
+      id_type: rawCase.suspect_details?.id_type || null,
+      id_number: rawCase.suspect_details?.id_number || null,
+      vehicle_no: rawCase.incident_data?.vehicle_no || null
+    };
+
+    let isRepeatOffender = false;
+    let isOrganizedCrime = false;
+    let matchedSuspectId: string | null = null;
+
+    if (newSuspect.name && newSuspect.name !== 'Unknown' && newSuspect.name !== 'None') {
+      const { data: existingRecords } = await supabase
+        .from('fir_records')
+        .select('district, data');
+
+      if (existingRecords) {
+        for (const record of existingRecords) {
+          const existingSuspects = record.data?.accused_suspects || [];
+          const existingDistrict = record.district || '';
+
+          for (const extSuspect of existingSuspects) {
+            const normalizedExisting = {
+              name: extSuspect.name,
+              age: extSuspect.age,
+              contact_phone: extSuspect.contact_phone || record.data?.communication_data?.phone_number,
+              id_type: extSuspect.id_type,
+              id_number: extSuspect.id_number,
+              vehicle_no: extSuspect.vehicle_no || record.data?.incident_data?.vehicle_no
+            };
+
+            if (isSameSuspect(newSuspect, normalizedExisting, district, existingDistrict)) {
+              isRepeatOffender = true;
+              matchedSuspectId = extSuspect.suspect_id || null;
+              if (record.data?.analytical_tags?.trend_indicators?.is_organized_crime) {
+                isOrganizedCrime = true;
+              }
+              break;
+            }
+          }
+          if (isRepeatOffender) break;
+        }
+      }
+    }
+
+    // Direct check for co-accused (more than 1 suspect in this FIR)
+    if (rawCase.suspect_details?.co_accused && rawCase.suspect_details.co_accused.length > 0) {
+      isOrganizedCrime = true;
+    }
+
     const newFirRecord = {
       fir_number: nextFirNumber,
       date_time_of_filing: rawCase.case_information?.date_time || new Date().toISOString(),
@@ -66,14 +239,14 @@ export async function POST(request: Request) {
         {
           name: rawCase.suspect_details?.name || 'Unknown',
           alias: null,
-          suspect_id: `SUS-KA-RPT-${nextNum}`,
+          suspect_id: matchedSuspectId || `SUS-KA-RPT-${nextNum}`,
           age: rawCase.suspect_details?.age ? Number(rawCase.suspect_details.age) : null,
           gender: rawCase.suspect_details?.gender || null,
           address: rawCase.suspect_details?.address || null,
           contact_phone: rawCase.communication_data?.phone_number || null,
           id_type: null,
           id_number: null,
-          prior_record_id: null,
+          prior_record_id: matchedSuspectId || null,
           arrest_status: 'Not Arrested',
           arrest_date: null
         }
@@ -130,15 +303,15 @@ export async function POST(request: Request) {
       },
       analytical_tags: {
         spatiotemporal: {
-          time_of_day: 'Unknown',
-          day_of_week: new Date().toLocaleDateString('en-US', { weekday: 'long' }),
-          is_weekend: [0, 6].includes(new Date().getDay()),
-          season: 'Unknown'
+          time_of_day: getTimeOfDay(rawCase.case_information?.date_time || new Date().toISOString()),
+          day_of_week: new Date(rawCase.case_information?.date_time || new Date()).toLocaleDateString('en-US', { weekday: 'long' }),
+          is_weekend: [0, 6].includes(new Date(rawCase.case_information?.date_time || new Date()).getDay()),
+          season: getSeason(rawCase.case_information?.date_time || new Date().toISOString())
         },
         trend_indicators: {
-          crime_category: 'Unknown',
-          is_repeat_offender: false,
-          is_organized_crime: false
+          crime_category: getCrimeCategory(crimeType),
+          is_repeat_offender: isRepeatOffender,
+          is_organized_crime: isOrganizedCrime
         }
       },
       closure_details: null
