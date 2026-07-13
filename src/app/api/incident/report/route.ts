@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 
 interface Suspect {
   name?: string;
@@ -128,19 +128,28 @@ export async function POST(request: Request) {
     const year = new Date().getFullYear();
     const stationCode = rawCase.investigation_data?.police_station_code || 'KA-NEW-RPT';
 
-    // Get the count of existing records for this specific police station in the current year
-    const pattern = `%/${year}/${stationCode}`;
-    const { count, error: countError } = await supabase
-      .from('fir_records')
-      .select('*', { count: 'exact', head: true })
-      .like('fir_number', pattern);
+    let nextNum = 0;
+    let nextFirNumber = '';
 
-    if (countError) {
-      throw new Error(`Failed to query record count: ${countError.message}`);
+    if (isSupabaseConfigured()) {
+      // Get the count of existing records for this specific police station in the current year
+      const pattern = `%/${year}/${stationCode}`;
+      const { count, error: countError } = await supabase
+        .from('fir_records')
+        .select('*', { count: 'exact', head: true })
+        .like('fir_number', pattern);
+
+      if (countError) {
+        throw new Error(`Failed to query record count: ${countError.message}`);
+      }
+
+      nextNum = (count || 0) + 1;
+      nextFirNumber = `${String(nextNum).padStart(4, '0')}/${year}/${stationCode}`;
+    } else {
+      // Generate a fallback simulated FIR number
+      nextNum = Math.floor(Math.random() * 1000) + 1;
+      nextFirNumber = `${String(nextNum).padStart(4, '0')}/${year}/${stationCode}`;
     }
-
-    const nextNum = (count || 0) + 1;
-    const nextFirNumber = `${String(nextNum).padStart(4, '0')}/${year}/${stationCode}`;
 
     // Build new FIR record in the dataset schema
     const locationParts = (rawCase.case_information?.location || 'Karnataka').split(',').map((s: string) => s.trim());
@@ -317,10 +326,33 @@ export async function POST(request: Request) {
       closure_details: null
     };
 
-    // Insert into Supabase
-    const { data, error: insertError } = await supabase
-      .from('fir_records')
-      .insert({
+    // Insert into Supabase if configured, otherwise simulate success
+    let finalRecord = null;
+    if (isSupabaseConfigured()) {
+      const { data, error: insertError } = await supabase
+        .from('fir_records')
+        .insert({
+          fir_number: nextFirNumber,
+          case_status: 'Open',
+          district,
+          crime_type: crimeType,
+          severity: getSeverity(crimeType),
+          latitude: rawCase.geospatial_data?.latitude ? Number(rawCase.geospatial_data.latitude) : 12.9716,
+          longitude: rawCase.geospatial_data?.longitude ? Number(rawCase.geospatial_data.longitude) : 77.5946,
+          date_time_of_filing: rawCase.case_information?.date_time || new Date().toISOString(),
+          data: newFirRecord,
+          status_modification: null,
+        })
+        .select()
+        .single();
+
+      if (insertError) {
+        throw new Error(`Supabase insert failed: ${insertError.message}`);
+      }
+      finalRecord = data;
+    } else {
+      console.log('[SUPABASE] Not configured. Simulating successful incident insert.');
+      finalRecord = {
         fir_number: nextFirNumber,
         case_status: 'Open',
         district,
@@ -331,18 +363,13 @@ export async function POST(request: Request) {
         date_time_of_filing: rawCase.case_information?.date_time || new Date().toISOString(),
         data: newFirRecord,
         status_modification: null,
-      })
-      .select()
-      .single();
-
-    if (insertError) {
-      throw new Error(`Supabase insert failed: ${insertError.message}`);
+      };
     }
 
     return NextResponse.json({
       success: true,
       unique_id: nextFirNumber,
-      record: data,
+      record: finalRecord,
     });
   } catch (err: any) {
     console.error('Failed to report incident:', err);

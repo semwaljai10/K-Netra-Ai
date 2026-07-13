@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 
 /**
  * GET /api/incidents — Fetch all incidents from Supabase.
@@ -8,6 +8,14 @@ import { supabase } from '@/lib/supabase';
  */
 export async function GET(request: NextRequest) {
   try {
+    if (!isSupabaseConfigured()) {
+      return NextResponse.json({
+        success: true,
+        records: [],
+        count: 0,
+      });
+    }
+
     const { searchParams } = new URL(request.url);
     const district = searchParams.get('district');
     const status = searchParams.get('status');

@@ -10,6 +10,14 @@ if (!supabaseUrl || !supabaseAnonKey) {
   );
 }
 
+export const isSupabaseConfigured = (): boolean => {
+  return !!(
+    supabaseUrl &&
+    supabaseAnonKey &&
+    !supabaseUrl.includes('placeholder')
+  );
+};
+
 // Singleton Supabase client — used by both server (API routes) and client components
 export const supabase = createClient(
   supabaseUrl || 'https://placeholder-url-for-build.supabase.co',

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 
 /**
  * PATCH /api/incidents/[id] — Update an incident's status in Supabase.
@@ -10,6 +10,10 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    if (!isSupabaseConfigured()) {
+      return NextResponse.json({ error: 'Database connection not configured' }, { status: 503 });
+    }
+
     const { id } = await params;
     const body = await request.json();
     const {
@@ -99,6 +103,10 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    if (!isSupabaseConfigured()) {
+      return NextResponse.json({ error: 'Database connection not configured' }, { status: 503 });
+    }
+
     const { id } = await params;
 
     const { data, error } = await supabase

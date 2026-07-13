@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 
 export async function POST(request: Request) {
   try {
@@ -15,26 +15,26 @@ export async function POST(request: Request) {
       let supabaseValue = '';
       let fetchSuccess = false;
 
-      // 1. Try to fetch from Supabase
-      try {
-        const { data, error } = await supabase
-          .from('session_store')
-          .select('value')
-          .eq('key', key)
-          .single();
+      // 1. Try to fetch from Supabase if configured
+      if (isSupabaseConfigured()) {
+        try {
+          const { data, error } = await supabase
+            .from('session_store')
+            .select('value')
+            .eq('key', key)
+            .single();
 
-        if (!error && data) {
-          supabaseValue = data.value;
-          fetchSuccess = true;
-        } else if (error && error.code !== 'PGRST116') {
-          // If error is code PGRST116, it just means the row was not found.
-          // Other codes mean the table or connection has issues (e.g. table doesn't exist yet).
-          console.warn(`[SUPABASE] Query warning for key "${key}":`, error.message);
-        } else if (!error) {
-          fetchSuccess = true;
+          if (!error && data) {
+            supabaseValue = data.value;
+            fetchSuccess = true;
+          } else if (error && error.code !== 'PGRST116') {
+            console.warn(`[SUPABASE] Query warning for key "${key}":`, error.message);
+          } else if (!error) {
+            fetchSuccess = true;
+          }
+        } catch (err: any) {
+          console.warn(`[SUPABASE] Exception querying key "${key}":`, err.message || err);
         }
-      } catch (err: any) {
-        console.warn(`[SUPABASE] Exception querying key "${key}":`, err.message || err);
       }
 
       // 2. Fall back to legacy key-value store if not found or if database query failed
@@ -51,21 +51,23 @@ export async function POST(request: Request) {
             if (data && data !== 'Value Not Found' && data !== 'Not Found' && !data.includes('error')) {
               supabaseValue = data;
               
-              // Seed the value to Supabase asynchronously so it's migrated for future calls
-              (async () => {
-                try {
-                  const { error } = await supabase
-                    .from('session_store')
-                    .upsert({ key, value: data, updated_at: new Date().toISOString() });
-                  if (error) {
-                    console.warn(`[SUPABASE] Auto-migration caching failed for key "${key}":`, error.message);
-                  } else {
-                    console.log(`[SUPABASE] Successfully migrated and cached key "${key}" from legacy proxy.`);
+              // Seed the value to Supabase asynchronously only if configured
+              if (isSupabaseConfigured()) {
+                (async () => {
+                  try {
+                    const { error } = await supabase
+                      .from('session_store')
+                      .upsert({ key, value: data, updated_at: new Date().toISOString() });
+                    if (error) {
+                      console.warn(`[SUPABASE] Auto-migration caching failed for key "${key}":`, error.message);
+                    } else {
+                      console.log(`[SUPABASE] Successfully migrated and cached key "${key}" from legacy proxy.`);
+                    }
+                  } catch (err) {
+                    console.warn(`[SUPABASE] Exception during caching for key "${key}":`, err);
                   }
-                } catch (err) {
-                  console.warn(`[SUPABASE] Exception during caching for key "${key}":`, err);
-                }
-              })();
+                })();
+              }
             }
           }
         } catch (legacyErr: any) {
@@ -77,19 +79,21 @@ export async function POST(request: Request) {
     } else if (action === 'update') {
       let success = false;
 
-      // 1. Update in Supabase
-      try {
-        const { error } = await supabase
-          .from('session_store')
-          .upsert({ key, value: String(value), updated_at: new Date().toISOString() });
+      // 1. Update in Supabase if configured
+      if (isSupabaseConfigured()) {
+        try {
+          const { error } = await supabase
+            .from('session_store')
+            .upsert({ key, value: String(value), updated_at: new Date().toISOString() });
 
-        if (!error) {
-          success = true;
-        } else {
-          console.warn(`[SUPABASE] Upsert error for key "${key}":`, error.message);
+          if (!error) {
+            success = true;
+          } else {
+            console.warn(`[SUPABASE] Upsert error for key "${key}":`, error.message);
+          }
+        } catch (err: any) {
+          console.warn(`[SUPABASE] Exception upserting key "${key}":`, err.message || err);
         }
-      } catch (err: any) {
-        console.warn(`[SUPABASE] Exception upserting key "${key}":`, err.message || err);
       }
 
       // 2. Also update in legacy key-value store to keep them in sync during migration transition
