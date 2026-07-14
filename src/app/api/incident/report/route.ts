@@ -1,6 +1,15 @@
 import { NextResponse } from 'next/server';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 
+function parseAge(val: any): string | number | null {
+  if (val === null || val === undefined) return null;
+  const trimmed = String(val).trim();
+  if (!trimmed) return null;
+  const num = Number(trimmed);
+  return isNaN(num) ? trimmed : num;
+}
+
+
 interface Suspect {
   name?: string;
   age?: number | string | null;
@@ -169,7 +178,7 @@ export async function POST(request: Request) {
     // --- Dynamic Identity Resolution & Behavioral Analytics ---
     const newSuspect = {
       name: rawCase.suspect_details?.name,
-      age: rawCase.suspect_details?.age ? Number(rawCase.suspect_details.age) : null,
+      age: parseAge(rawCase.suspect_details?.age),
       contact_phone: rawCase.communication_data?.phone_number || null,
       id_type: rawCase.suspect_details?.id_type || null,
       id_number: rawCase.suspect_details?.id_number || null,
@@ -236,7 +245,7 @@ export async function POST(request: Request) {
       },
       complainant: {
         name: rawCase.victim_details?.name || 'Unknown',
-        age: rawCase.victim_details?.age ? Number(rawCase.victim_details.age) : null,
+        age: parseAge(rawCase.victim_details?.age),
         gender: rawCase.victim_details?.gender || null,
         address: null,
         contact_phone: null,
@@ -249,7 +258,7 @@ export async function POST(request: Request) {
           name: rawCase.suspect_details?.name || 'Unknown',
           alias: null,
           suspect_id: matchedSuspectId || `SUS-KA-RPT-${nextNum}`,
-          age: rawCase.suspect_details?.age ? Number(rawCase.suspect_details.age) : null,
+          age: parseAge(rawCase.suspect_details?.age),
           gender: rawCase.suspect_details?.gender || null,
           address: rawCase.suspect_details?.address || null,
           contact_phone: rawCase.communication_data?.phone_number || null,
@@ -263,7 +272,7 @@ export async function POST(request: Request) {
       victims: [
         {
           name: rawCase.victim_details?.name || 'Unknown',
-          age: rawCase.victim_details?.age ? Number(rawCase.victim_details.age) : null,
+          age: parseAge(rawCase.victim_details?.age),
           gender: rawCase.victim_details?.gender || null,
           address: null,
           relation_to_accused: rawCase.victim_details?.relation_to_suspect || 'N/A',
