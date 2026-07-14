@@ -45,3 +45,8 @@ next-env.d.ts
 # python venv
 /.venv_old
 
+# Zoho Catalyst
+.catalystrc
+catalyst-debug.log
+build.zip
+
