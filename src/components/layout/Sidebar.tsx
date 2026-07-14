@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import Image from 'next/image';
+import logoImg from '../../../public/k-netra-logo-transparent.png';
 import { useApp, ActiveView } from '@/context/AppContext';
 import {
   LayoutDashboard,
@@ -66,7 +67,7 @@ export default function Sidebar() {
       <div className="sidebar-header">
         <div className="logo-box">
           <div className="logo-icon">
-            <Image src="/k-netra-logo-transparent.png" alt="K-Netra Logo" width={32} height={32} priority />
+            <Image src={logoImg} alt="K-Netra Logo" width={32} height={32} priority />
           </div>
           <span className="logo-text">K-NETRA AI</span>
         </div>
