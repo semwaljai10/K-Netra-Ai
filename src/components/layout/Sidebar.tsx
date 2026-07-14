@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import Image from 'next/image';
 import { useApp, ActiveView } from '@/context/AppContext';
 import {
   LayoutDashboard,
@@ -65,7 +66,7 @@ export default function Sidebar() {
       <div className="sidebar-header">
         <div className="logo-box">
           <div className="logo-icon">
-            <img src="/k-netra-logo-transparent.png" alt="K-Netra Logo" />
+            <Image src="/k-netra-logo-transparent.png" alt="K-Netra Logo" width={32} height={32} priority />
           </div>
           <span className="logo-text">K-NETRA AI</span>
         </div>

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import Image from 'next/image';
 import { useApp } from '@/context/AppContext';
 import { ShieldAlert, Lock, User, ArrowRight, Eye, EyeOff } from 'lucide-react';
 
@@ -88,7 +89,7 @@ export default function LoginScreen() {
         {/* Floating cyber header */}
         <div className="login-header">
           <div className="login-logo">
-            <img src="/k-netra-logo-transparent.png" alt="K-Netra Logo" />
+            <Image src="/k-netra-logo-transparent.png" alt="K-Netra Logo" width={56} height={56} priority />
           </div>
           <h1>K-NETRA COMMAND</h1>
           <p>{telemetry}</p>
