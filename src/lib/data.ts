@@ -310,14 +310,17 @@ rawCrimeData.forEach((item: any) => {
     item.geospatial_data.longitude
   ];
   
-  const suspectName = item.suspect_details.name;
+  const suspects = item.accusedSuspects || (item._source?.all_suspects) || [item.suspect_details];
   
-  if (suspectName && suspectName !== 'None' && suspectName !== 'Unknown') {
-    if (!offenderMap.has(suspectName)) {
-      offenderMap.set(suspectName, { name: suspectName, incidents: [] });
+  suspects.forEach((sus: any) => {
+    const suspectName = sus?.name;
+    if (suspectName && suspectName !== 'None' && suspectName !== 'Unknown') {
+      if (!offenderMap.has(suspectName)) {
+        offenderMap.set(suspectName, { name: suspectName, incidents: [] });
+      }
+      offenderMap.get(suspectName)!.incidents.push(item);
     }
-    offenderMap.get(suspectName)!.incidents.push(item);
-  }
+  });
   
   const sections = item.case_information.ipc_bns_sections.join(' / ');
   const victimName = item.victim_details.name;
@@ -444,8 +447,8 @@ offenderList.forEach(off => offenderNameToIdMap.set(off.name, off.id));
 
 MOCK_INCIDENTS.forEach(inc => {
   const originalRecord = rawCrimeData.find(item => item.case_information.unique_id === inc.id);
-  if (originalRecord && originalRecord.suspect_details && originalRecord.suspect_details.name) {
-    const sName = originalRecord.suspect_details.name;
+  if (originalRecord) {
+    const sName = originalRecord.suspect_details?.name || originalRecord.accused_suspects?.[0]?.name;
     if (sName && sName !== 'None' && sName !== 'Unknown') {
       inc.offenderId = offenderNameToIdMap.get(sName) || null;
     }
@@ -486,14 +489,17 @@ export function processRawIncidentsData(rawCases: any[]) {
       item.geospatial_data.longitude
     ];
     
-    const suspectName = item.suspect_details.name;
+    const suspects = item.accusedSuspects || (item._source?.all_suspects) || [item.suspect_details];
     
-    if (suspectName && suspectName !== 'None' && suspectName !== 'Unknown') {
-      if (!offenderMap.has(suspectName)) {
-        offenderMap.set(suspectName, { name: suspectName, incidents: [] });
+    suspects.forEach((sus: any) => {
+      const suspectName = sus?.name;
+      if (suspectName && suspectName !== 'None' && suspectName !== 'Unknown') {
+        if (!offenderMap.has(suspectName)) {
+          offenderMap.set(suspectName, { name: suspectName, incidents: [] });
+        }
+        offenderMap.get(suspectName)!.incidents.push(item);
       }
-      offenderMap.get(suspectName)!.incidents.push(item);
-    }
+    });
     
     const sections = item.case_information.ipc_bns_sections.join(' / ');
     const victimName = item.victim_details.name;
@@ -610,8 +616,8 @@ export function processRawIncidentsData(rawCases: any[]) {
   
   incidentsList.forEach(inc => {
     const originalRecord = rawCases.find(item => item.case_information.unique_id === inc.id);
-    if (originalRecord && originalRecord.suspect_details && originalRecord.suspect_details.name) {
-      const sName = originalRecord.suspect_details.name;
+    if (originalRecord) {
+      const sName = originalRecord.suspect_details?.name || originalRecord.accusedSuspects?.[0]?.name || originalRecord.accused_suspects?.[0]?.name;
       if (sName && sName !== 'None' && sName !== 'Unknown') {
         inc.offenderId = nameToIdMap.get(sName) || null;
       }

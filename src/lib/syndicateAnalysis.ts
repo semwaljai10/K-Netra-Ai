@@ -96,11 +96,17 @@ export function buildSyndicateLinks(
   // Pre-index: map offender name → raw incident records
   const nameToIncidents = new Map<string, any[]>();
   rawCrimeData.forEach((item: any) => {
-    const name = item.suspect_details?.name;
-    if (name && name !== 'None' && name !== 'Unknown') {
-      if (!nameToIncidents.has(name)) nameToIncidents.set(name, []);
-      nameToIncidents.get(name)!.push(item);
-    }
+    const suspects = item.accusedSuspects || item.accused_suspects || (item._source?.all_suspects) || [item.suspect_details];
+    suspects.forEach((sus: any) => {
+      const name = sus?.name;
+      if (name && name !== 'None' && name !== 'Unknown') {
+        if (!nameToIncidents.has(name)) nameToIncidents.set(name, []);
+        const list = nameToIncidents.get(name)!;
+        if (!list.includes(item)) {
+          list.push(item);
+        }
+      }
+    });
   });
 
   // Pre-index: map offender ID → offender name

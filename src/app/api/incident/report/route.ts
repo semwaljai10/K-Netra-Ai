@@ -46,6 +46,14 @@ function getCrimeCategory(crimeType: string): string {
   return 'General';
 }
 
+function parseAgeValue(val: any): number | string | null {
+  if (val === undefined || val === null || val === '') return null;
+  const strVal = String(val).trim();
+  if (strVal.includes('-')) return strVal;
+  const num = Number(strVal);
+  return isNaN(num) ? strVal : num;
+}
+
 function isSameSuspect(
   newSuspect: Suspect,
   existingSuspect: Suspect,
@@ -167,30 +175,58 @@ export async function POST(request: Request) {
     };
 
     // --- Dynamic Identity Resolution & Behavioral Analytics ---
-    const newSuspect = {
-      name: rawCase.suspect_details?.name,
-      age: rawCase.suspect_details?.age ? Number(rawCase.suspect_details.age) : null,
-      contact_phone: rawCase.communication_data?.phone_number || null,
-      id_type: rawCase.suspect_details?.id_type || null,
-      id_number: rawCase.suspect_details?.id_number || null,
-      vehicle_no: rawCase.incident_data?.vehicle_no || null
-    };
+    const suspectsInput = rawCase.suspects || [
+      {
+        name: rawCase.suspect_details?.name,
+        age: rawCase.suspect_details?.age,
+        gender: rawCase.suspect_details?.gender || null,
+        address: rawCase.suspect_details?.address || null,
+        contact_phone: rawCase.communication_data?.phone_number || null,
+        id_type: rawCase.suspect_details?.id_type || null,
+        id_number: rawCase.suspect_details?.id_number || null,
+        vehicle_no: rawCase.incident_data?.vehicle_no || null
+      }
+    ];
+
+    const victimsInput = rawCase.victims || [
+      {
+        name: rawCase.victim_details?.name,
+        age: rawCase.victim_details?.age,
+        gender: rawCase.victim_details?.gender || null,
+        relation_to_suspect: rawCase.victim_details?.relation_to_suspect || 'N/A'
+      }
+    ];
 
     let isRepeatOffender = false;
-    let isOrganizedCrime = false;
-    let matchedSuspectId: string | null = null;
+    let isOrganizedCrime = suspectsInput.length > 1;
 
-    if (newSuspect.name && newSuspect.name !== 'Unknown' && newSuspect.name !== 'None') {
-      const { data: existingRecords } = await supabase
+    // Fetch existing records for matching
+    const hasSuspectsToMatch = suspectsInput.some((s: any) => s.name && s.name !== 'Unknown' && s.name !== 'None');
+    let existingRecords: any[] | null = null;
+    if (hasSuspectsToMatch && isSupabaseConfigured()) {
+      const { data } = await supabase
         .from('fir_records')
         .select('district, data');
+      existingRecords = data;
+    }
 
-      if (existingRecords) {
+    const resolvedSuspects = suspectsInput.map((sus: any, index: number) => {
+      let matchedSuspectId: string | null = null;
+      const normalizedSus = {
+        name: sus.name,
+        age: parseAgeValue(sus.age),
+        contact_phone: sus.contact_phone || rawCase.communication_data?.phone_number || null,
+        id_type: sus.id_type || null,
+        id_number: sus.id_number || null,
+        vehicle_no: sus.vehicle_no || rawCase.incident_data?.vehicle_no || null
+      };
+
+      if (normalizedSus.name && normalizedSus.name !== 'Unknown' && normalizedSus.name !== 'None' && existingRecords) {
         for (const record of existingRecords) {
-          const existingSuspects = record.data?.accused_suspects || [];
+          const extSuspects = record.data?.accused_suspects || [];
           const existingDistrict = record.district || '';
 
-          for (const extSuspect of existingSuspects) {
+          for (const extSuspect of extSuspects) {
             const normalizedExisting = {
               name: extSuspect.name,
               age: extSuspect.age,
@@ -200,7 +236,7 @@ export async function POST(request: Request) {
               vehicle_no: extSuspect.vehicle_no || record.data?.incident_data?.vehicle_no
             };
 
-            if (isSameSuspect(newSuspect, normalizedExisting, district, existingDistrict)) {
+            if (isSameSuspect(normalizedSus, normalizedExisting, district, existingDistrict)) {
               isRepeatOffender = true;
               matchedSuspectId = extSuspect.suspect_id || null;
               if (record.data?.analytical_tags?.trend_indicators?.is_organized_crime) {
@@ -209,10 +245,27 @@ export async function POST(request: Request) {
               break;
             }
           }
-          if (isRepeatOffender) break;
+          if (matchedSuspectId) break;
         }
       }
-    }
+
+      const suspectId = matchedSuspectId || (suspectsInput.length > 1 ? `SUS-KA-RPT-${nextNum}-${index + 1}` : `SUS-KA-RPT-${nextNum}`);
+
+      return {
+        name: sus.name || 'Unknown',
+        alias: sus.name && sus.name !== 'Unknown' ? sus.name.split(' ')[0] : null,
+        suspect_id: suspectId,
+        age: parseAgeValue(sus.age),
+        gender: sus.gender || null,
+        address: sus.address || null,
+        contact_phone: sus.contact_phone || rawCase.communication_data?.phone_number || null,
+        id_type: sus.id_type || null,
+        id_number: sus.id_number || null,
+        prior_record_id: matchedSuspectId || null,
+        arrest_status: 'Not Arrested',
+        arrest_date: null
+      };
+    });
 
     // Direct check for co-accused (more than 1 suspect in this FIR)
     if (rawCase.suspect_details?.co_accused && rawCase.suspect_details.co_accused.length > 0) {
@@ -235,41 +288,24 @@ export async function POST(request: Request) {
         contact: null
       },
       complainant: {
-        name: rawCase.victim_details?.name || 'Unknown',
-        age: rawCase.victim_details?.age ? Number(rawCase.victim_details.age) : null,
-        gender: rawCase.victim_details?.gender || null,
+        name: rawCase.victim_details?.name || victimsInput[0]?.name || 'Unknown',
+        age: parseAgeValue(rawCase.victim_details?.age || victimsInput[0]?.age),
+        gender: rawCase.victim_details?.gender || victimsInput[0]?.gender || null,
         address: null,
         contact_phone: null,
         contact_email: null,
         id_type: null,
         id_number: null
       },
-      accused_suspects: [
-        {
-          name: rawCase.suspect_details?.name || 'Unknown',
-          alias: null,
-          suspect_id: matchedSuspectId || `SUS-KA-RPT-${nextNum}`,
-          age: rawCase.suspect_details?.age ? Number(rawCase.suspect_details.age) : null,
-          gender: rawCase.suspect_details?.gender || null,
-          address: rawCase.suspect_details?.address || null,
-          contact_phone: rawCase.communication_data?.phone_number || null,
-          id_type: null,
-          id_number: null,
-          prior_record_id: matchedSuspectId || null,
-          arrest_status: 'Not Arrested',
-          arrest_date: null
-        }
-      ],
-      victims: [
-        {
-          name: rawCase.victim_details?.name || 'Unknown',
-          age: rawCase.victim_details?.age ? Number(rawCase.victim_details.age) : null,
-          gender: rawCase.victim_details?.gender || null,
-          address: null,
-          relation_to_accused: rawCase.victim_details?.relation_to_suspect || 'N/A',
-          injury_description: null
-        }
-      ],
+      accused_suspects: resolvedSuspects,
+      victims: victimsInput.map((vic: any) => ({
+        name: vic.name || 'Unknown',
+        age: parseAgeValue(vic.age),
+        gender: vic.gender || null,
+        address: null,
+        relation_to_accused: vic.relation_to_suspect || 'N/A',
+        injury_description: null
+      })),
       crime_classification: {
         ipc_sections: rawCase.case_information?.ipc_bns_sections || ['N/A'],
         bns_sections: null,
@@ -302,8 +338,15 @@ export async function POST(request: Request) {
         vehicle_numbers: rawCase.incident_data?.vehicle_no && rawCase.incident_data.vehicle_no !== 'None'
           ? [rawCase.incident_data.vehicle_no] : null,
         device_ids: null,
-        phone_numbers: rawCase.communication_data?.phone_number
-          ? [rawCase.communication_data.phone_number] : null,
+        phone_numbers: (() => {
+          const list = Array.from(new Set(
+            [
+              rawCase.communication_data?.phone_number,
+              ...resolvedSuspects.map((s: any) => s.contact_phone)
+            ].filter(Boolean)
+          ));
+          return list.length > 0 ? list : null;
+        })(),
         bank_accounts: null,
         social_media_handles: rawCase.communication_data?.social_handles || null,
         officer_ids_involved: rawCase.investigation_data?.investigating_officer_id

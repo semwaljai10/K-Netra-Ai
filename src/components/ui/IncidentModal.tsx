@@ -280,7 +280,7 @@ export default function IncidentModal() {
                         <div style={{ fontWeight: 'bold' }}>{victim.name}</div>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.25rem', fontSize: '0.8rem', marginTop: '0.25rem' }}>
                           <div><strong>Age / Gender:</strong> {victim.age || 'N/A'} / {victim.gender || 'N/A'}</div>
-                          <div><strong>Relation to Suspect:</strong> {victim.relation_to_accused || 'N/A'}</div>
+                          <div><strong>Relation to Suspect:</strong> {victim.relation_to_accused || victim.relation_to_suspect || 'N/A'}</div>
                           {victim.injury_description && <div style={{ gridColumn: 'span 2', color: 'var(--color-yellow)', fontSize: '0.75rem' }}><strong>Injury Description:</strong> {victim.injury_description}</div>}
                         </div>
                       </div>

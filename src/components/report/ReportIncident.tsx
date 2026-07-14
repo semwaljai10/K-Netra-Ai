@@ -291,15 +291,33 @@ export default function ReportIncident() {
   const [dateTime, setDateTime] = useState('');
   const [location, setLocation] = useState('');
 
-  const [victimName, setVictimName] = useState('');
-  const [victimAge, setVictimAge] = useState('');
-  const [victimGender, setVictimGender] = useState('');
-  const [victimRelation, setVictimRelation] = useState('');
+  const [victims, setVictims] = useState([
+    { name: '', age: '', gender: '', relation: '' }
+  ]);
 
-  const [suspectName, setSuspectName] = useState('');
-  const [suspectAddress, setSuspectAddress] = useState('');
-  const [suspectAge, setSuspectAge] = useState('');
-  const [suspectGender, setSuspectGender] = useState('');
+  const [suspects, setSuspects] = useState([
+    { name: '', address: '', age: '', gender: '' }
+  ]);
+
+  const addVictim = () => {
+    setVictims(prev => [...prev, { name: '', age: '', gender: '', relation: '' }]);
+  };
+  const removeVictim = (index: number) => {
+    setVictims(prev => prev.filter((_, idx) => idx !== index));
+  };
+  const updateVictim = (index: number, key: string, value: string) => {
+    setVictims(prev => prev.map((v, idx) => idx === index ? { ...v, [key]: value } : v));
+  };
+
+  const addSuspect = () => {
+    setSuspects(prev => [...prev, { name: '', address: '', age: '', gender: '' }]);
+  };
+  const removeSuspect = (index: number) => {
+    setSuspects(prev => prev.filter((_, idx) => idx !== index));
+  };
+  const updateSuspect = (index: number, key: string, value: string) => {
+    setSuspects(prev => prev.map((s, idx) => idx === index ? { ...s, [key]: value } : s));
+  };
 
   const [crimeType, setCrimeType] = useState('');
   const [crimeSubcategory, setCrimeSubcategory] = useState('');
@@ -320,14 +338,8 @@ export default function ReportIncident() {
     setSectionsStr('');
     setDateTime('');
     setLocation('');
-    setVictimName('');
-    setVictimAge('');
-    setVictimGender('');
-    setVictimRelation('');
-    setSuspectName('');
-    setSuspectAddress('');
-    setSuspectAge('');
-    setSuspectGender('');
+    setVictims([{ name: '', age: '', gender: '', relation: '' }]);
+    setSuspects([{ name: '', address: '', age: '', gender: '' }]);
     setCrimeType('');
     setCrimeSubcategory('');
     setWeaponUsed('');
@@ -415,18 +427,32 @@ export default function ReportIncident() {
           date_time: new Date(dateTime).toISOString(),
           location: `${location}, ${districtName}`
         },
+        // Maintain single properties for backward compatibility
         suspect_details: {
-          name: suspectName,
-          address: suspectAddress,
-          age: parseAgeInput(suspectAge),
-          gender: suspectGender || null
+          name: suspects[0]?.name || 'Unknown',
+          address: suspects[0]?.address || 'Not Available',
+          age: parseAgeInput(suspects[0]?.age),
+          gender: suspects[0]?.gender || null
         },
         victim_details: {
-          name: victimName,
-          age: parseAgeInput(victimAge),
-          gender: victimGender,
-          relation_to_suspect: victimRelation
+          name: victims[0]?.name || 'Unknown',
+          age: parseAgeInput(victims[0]?.age),
+          gender: victims[0]?.gender || null,
+          relation_to_suspect: victims[0]?.relation || 'N/A'
         },
+        // Supporting multiple suspects and victims arrays
+        suspects: suspects.map(s => ({
+          name: s.name || 'Unknown',
+          address: s.address || 'Not Available',
+          age: parseAgeInput(s.age),
+          gender: s.gender || null
+        })),
+        victims: victims.map(v => ({
+          name: v.name || 'Unknown',
+          age: parseAgeInput(v.age),
+          gender: v.gender || null,
+          relation_to_suspect: v.relation || 'N/A'
+        })),
         incident_data: {
           crime_type: crimeType,
           crime_subcategory: crimeSubcategory,
@@ -471,25 +497,29 @@ export default function ReportIncident() {
         coords: [lat, lng],
         offenderId: null,
         status: status,
-        description: `FIR registered under sections: ${sections.join(' / ')}. Incident location: ${location}. Victim: ${victimName} (${victimAge}, ${victimGender}), relation: ${victimRelation}. Officer: ${officerName} (${officerRank}) at ${policeStation}. Weapon: ${weaponUsed}. Vehicle: ${vehicleNo}. Evidence: ${evidenceSummary}.`
+        description: `FIR registered under sections: ${sections.join(' / ')}. Incident location: ${location}. ` +
+          `Victims: ${victims.map(v => `${v.name} (${v.age || 'N/A'}, ${v.gender || 'N/A'})`).join(', ')}. ` +
+          `Suspects: ${suspects.map(s => `${s.name} (${s.age || 'N/A'}, ${s.gender || 'N/A'})`).join(', ')}. ` +
+          `Officer: ${officerName} (${officerRank}) at ${policeStation}. Weapon: ${weaponUsed}. Vehicle: ${vehicleNo}. Evidence: ${evidenceSummary}.`
       };
 
       // If suspect is specified, prepare suspect state
       let formattedOffender: Offender | undefined = undefined;
-      if (suspectName && suspectName !== 'None' && suspectName !== 'Unknown') {
-        const hash = suspectName.length * 17;
-        const sAge = parseAgeInput(suspectAge);
+      const primarySuspect = suspects[0];
+      if (primarySuspect && primarySuspect.name && primarySuspect.name !== 'None' && primarySuspect.name !== 'Unknown') {
+        const hash = primarySuspect.name.length * 17;
+        const sAge = parseAgeInput(primarySuspect.age);
         formattedOffender = {
           id: `OFF-${String(100 + Math.floor(Math.random() * 899))}`, // server overrides if matched
-          name: suspectName,
-          alias: suspectName.split(' ')[0],
+          name: primarySuspect.name,
+          alias: primarySuspect.name.split(' ')[0],
           age: sAge !== null ? sAge : 22 + (hash % 38),
-          gender: suspectGender || undefined,
+          gender: primarySuspect.gender || undefined,
           status: 'Active',
           riskScore: 55 + (hash % 40),
           primaryCrime: crimeType,
           arrestCount: 1,
-          avatar: `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(suspectName)}`,
+          avatar: `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(primarySuspect.name)}`,
           associates: [],
           history: [
             {
@@ -755,99 +785,147 @@ export default function ReportIncident() {
                 </div>
               </GlassPanel>
 
-              {/* SECTION 3: COMPLAINANT / VICTIM */}
+              {/* SECTION 3: COMPLAINANT / VICTIMS */}
               <GlassPanel style={{ padding: '1.5rem' }}>
-                <h3 style={{ fontSize: '0.9rem', fontWeight: 'bold', color: 'var(--color-success)', marginBottom: '1rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                  3. Complainant / Victim details
-                </h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '1rem' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                      <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Victim Name</label>
-                      <input
-                        type="text"
-                        value={victimName}
-                        onChange={e => setVictimName(e.target.value)}
-                        required
-                        placeholder="Enter victim name"
-                        style={{
-                          background: 'rgba(0,0,0,0.25)',
-                          border: '1px solid rgba(255,255,255,0.08)',
-                          borderRadius: '6px',
-                          padding: '0.55rem',
-                          color: 'var(--text-primary)',
-                          fontSize: '0.85rem',
-                          outline: 'none'
-                        }}
-                      />
-                    </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                  <h3 style={{ fontSize: '0.9rem', fontWeight: 'bold', color: 'var(--color-success)', margin: 0, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    3. Complainant / Victim details
+                  </h3>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={addVictim}
+                    style={{ padding: '0.2rem 0.6rem', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.2rem', cursor: 'pointer' }}
+                  >
+                    <span>+</span> Add Victim
+                  </button>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                  {victims.map((victim, index) => (
+                    <div key={index} style={{
+                      padding: '1rem',
+                      borderRadius: '6px',
+                      border: '1px solid rgba(255,255,255,0.05)',
+                      background: 'rgba(0,0,0,0.15)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.75rem',
+                      position: 'relative'
+                    }}>
+                      {victims.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => removeVictim(index)}
+                          style={{
+                            position: 'absolute',
+                            top: '0.5rem',
+                            right: '0.5rem',
+                            border: 'none',
+                            background: 'rgba(239, 68, 68, 0.1)',
+                            color: 'var(--color-red)',
+                            borderRadius: '4px',
+                            padding: '0.2rem 0.5rem',
+                            fontSize: '0.7rem',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          Remove
+                        </button>
+                      )}
+                      <div style={{ fontSize: '0.75rem', fontWeight: 'bold', color: 'var(--text-muted)' }}>
+                        Victim #{index + 1}
+                      </div>
+                      
+                      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '1rem' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                          <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Victim Name</label>
+                          <input
+                            type="text"
+                            value={victim.name}
+                            onChange={e => updateVictim(index, 'name', e.target.value)}
+                            required
+                            placeholder="Enter victim name"
+                            style={{
+                              background: 'rgba(0,0,0,0.25)',
+                              border: '1px solid rgba(255,255,255,0.08)',
+                              borderRadius: '6px',
+                              padding: '0.55rem',
+                              color: 'var(--text-primary)',
+                              fontSize: '0.85rem',
+                              outline: 'none'
+                            }}
+                          />
+                        </div>
 
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                      <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Victim Age</label>
-                      <input
-                        type="text"
-                        value={victimAge}
-                        onChange={e => setVictimAge(e.target.value)}
-                        required
-                        placeholder="e.g. 25 or 25-30"
-                        style={{
-                          background: 'rgba(0,0,0,0.25)',
-                          border: '1px solid rgba(255,255,255,0.08)',
-                          borderRadius: '6px',
-                          padding: '0.55rem',
-                          color: 'var(--text-primary)',
-                          fontSize: '0.85rem',
-                          outline: 'none'
-                        }}
-                      />
-                    </div>
-                  </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                          <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Victim Age</label>
+                          <input
+                            type="text"
+                            value={victim.age}
+                            onChange={e => updateVictim(index, 'age', e.target.value)}
+                            required
+                            placeholder="e.g. 25"
+                            style={{
+                              background: 'rgba(0,0,0,0.25)',
+                              border: '1px solid rgba(255,255,255,0.08)',
+                              borderRadius: '6px',
+                              padding: '0.55rem',
+                              color: 'var(--text-primary)',
+                              fontSize: '0.85rem',
+                              outline: 'none'
+                            }}
+                          />
+                        </div>
+                      </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                      <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Victim Gender</label>
-                      <select
-                        className="report-select"
-                        value={victimGender}
-                        onChange={e => setVictimGender(e.target.value)}
-                        required
-                        style={{
-                          background: 'rgba(0,0,0,0.25)',
-                          border: '1px solid rgba(255,255,255,0.08)',
-                          borderRadius: '6px',
-                          padding: '0.55rem',
-                          color: 'var(--text-primary)',
-                          fontSize: '0.85rem',
-                          outline: 'none'
-                        }}
-                      >
-                        <option value="">Select Gender</option>
-                        <option value="Male">Male</option>
-                        <option value="Female">Female</option>
-                        <option value="Other">Other</option>
-                      </select>
-                    </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                          <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Victim Gender</label>
+                          <select
+                            className="report-select"
+                            value={victim.gender}
+                            onChange={e => updateVictim(index, 'gender', e.target.value)}
+                            required
+                            style={{
+                              background: 'rgba(0,0,0,0.25)',
+                              border: '1px solid rgba(255,255,255,0.08)',
+                              borderRadius: '6px',
+                              padding: '0.55rem',
+                              color: 'var(--text-primary)',
+                              fontSize: '0.85rem',
+                              outline: 'none',
+                              width: '100%'
+                            }}
+                          >
+                            <option value="">Select Gender</option>
+                            <option value="Male">Male</option>
+                            <option value="Female">Female</option>
+                            <option value="Other">Other</option>
+                          </select>
+                        </div>
 
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                      <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Relation to Suspect</label>
-                      <input
-                        type="text"
-                        value={victimRelation}
-                        onChange={e => setVictimRelation(e.target.value)}
-                        required
-                        placeholder="e.g. Stranger, Spouse, Business Partner"
-                        style={{
-                          background: 'rgba(0,0,0,0.25)',
-                          border: '1px solid rgba(255,255,255,0.08)',
-                          borderRadius: '6px',
-                          padding: '0.55rem',
-                          color: 'var(--text-primary)',
-                          fontSize: '0.85rem',
-                          outline: 'none'
-                        }}
-                      />
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                          <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Relation to Suspect</label>
+                          <input
+                            type="text"
+                            value={victim.relation}
+                            onChange={e => updateVictim(index, 'relation', e.target.value)}
+                            required
+                            placeholder="e.g. Stranger, Spouse"
+                            style={{
+                              background: 'rgba(0,0,0,0.25)',
+                              border: '1px solid rgba(255,255,255,0.08)',
+                              borderRadius: '6px',
+                              padding: '0.55rem',
+                              color: 'var(--text-primary)',
+                              fontSize: '0.85rem',
+                              outline: 'none'
+                            }}
+                          />
+                        </div>
+                      </div>
                     </div>
-                  </div>
+                  ))}
                 </div>
               </GlassPanel>
 
@@ -858,95 +936,143 @@ export default function ReportIncident() {
 
               {/* SECTION 4: SUSPECT DETAILS */}
               <GlassPanel style={{ padding: '1.5rem' }}>
-                <h3 style={{ fontSize: '0.9rem', fontWeight: 'bold', color: 'var(--color-success)', marginBottom: '1rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                  4. Accused / Suspect Details
-                </h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '1rem' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                      <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Suspect Full Name</label>
-                      <input
-                        type="text"
-                        value={suspectName}
-                        onChange={e => setSuspectName(e.target.value)}
-                        required
-                        placeholder="Type 'Unknown' if suspect is not identified"
-                        style={{
-                          background: 'rgba(0,0,0,0.25)',
-                          border: '1px solid rgba(255,255,255,0.08)',
-                          borderRadius: '6px',
-                          padding: '0.55rem',
-                          color: 'var(--text-primary)',
-                          fontSize: '0.85rem',
-                          outline: 'none'
-                        }}
-                      />
-                    </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                  <h3 style={{ fontSize: '0.9rem', fontWeight: 'bold', color: 'var(--color-success)', margin: 0, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    4. Accused / Suspect Details
+                  </h3>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={addSuspect}
+                    style={{ padding: '0.2rem 0.6rem', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.2rem', cursor: 'pointer' }}
+                  >
+                    <span>+</span> Add Suspect
+                  </button>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                  {suspects.map((suspect, index) => (
+                    <div key={index} style={{
+                      padding: '1rem',
+                      borderRadius: '6px',
+                      border: '1px solid rgba(255,255,255,0.05)',
+                      background: 'rgba(0,0,0,0.15)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.75rem',
+                      position: 'relative'
+                    }}>
+                      {suspects.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => removeSuspect(index)}
+                          style={{
+                            position: 'absolute',
+                            top: '0.5rem',
+                            right: '0.5rem',
+                            border: 'none',
+                            background: 'rgba(239, 68, 68, 0.1)',
+                            color: 'var(--color-red)',
+                            borderRadius: '4px',
+                            padding: '0.2rem 0.5rem',
+                            fontSize: '0.7rem',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          Remove
+                        </button>
+                      )}
+                      <div style={{ fontSize: '0.75rem', fontWeight: 'bold', color: 'var(--text-muted)' }}>
+                        Suspect #{index + 1}
+                      </div>
 
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                      <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Suspect Age</label>
-                      <input
-                        type="text"
-                        value={suspectAge}
-                        onChange={e => setSuspectAge(e.target.value)}
-                        placeholder="e.g. 25 or 25-30"
-                        style={{
-                          background: 'rgba(0,0,0,0.25)',
-                          border: '1px solid rgba(255,255,255,0.08)',
-                          borderRadius: '6px',
-                          padding: '0.55rem',
-                          color: 'var(--text-primary)',
-                          fontSize: '0.85rem',
-                          outline: 'none'
-                        }}
-                      />
-                    </div>
-                  </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '1rem' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                          <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Suspect Full Name</label>
+                          <input
+                            type="text"
+                            value={suspect.name}
+                            onChange={e => updateSuspect(index, 'name', e.target.value)}
+                            required
+                            placeholder="Type 'Unknown' if suspect is not identified"
+                            style={{
+                              background: 'rgba(0,0,0,0.25)',
+                              border: '1px solid rgba(255,255,255,0.08)',
+                              borderRadius: '6px',
+                              padding: '0.55rem',
+                              color: 'var(--text-primary)',
+                              fontSize: '0.85rem',
+                              outline: 'none'
+                            }}
+                          />
+                        </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '1rem' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                      <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Suspect Address</label>
-                      <input
-                        type="text"
-                        value={suspectAddress}
-                        onChange={e => setSuspectAddress(e.target.value)}
-                        required
-                        placeholder="e.g. Gokula Road, Hubballi"
-                        style={{
-                          background: 'rgba(0,0,0,0.25)',
-                          border: '1px solid rgba(255,255,255,0.08)',
-                          borderRadius: '6px',
-                          padding: '0.55rem',
-                          color: 'var(--text-primary)',
-                          fontSize: '0.85rem',
-                          outline: 'none'
-                        }}
-                      />
-                    </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                          <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Suspect Age</label>
+                          <input
+                            type="text"
+                            value={suspect.age}
+                            onChange={e => updateSuspect(index, 'age', e.target.value)}
+                            placeholder="e.g. 25"
+                            style={{
+                              background: 'rgba(0,0,0,0.25)',
+                              border: '1px solid rgba(255,255,255,0.08)',
+                              borderRadius: '6px',
+                              padding: '0.55rem',
+                              color: 'var(--text-primary)',
+                              fontSize: '0.85rem',
+                              outline: 'none'
+                            }}
+                          />
+                        </div>
+                      </div>
 
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                      <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Suspect Gender</label>
-                      <select
-                        className="report-select"
-                        value={suspectGender}
-                        onChange={e => setSuspectGender(e.target.value)}
-                        style={{
-                          background: 'rgba(0,0,0,0.25)',
-                          border: '1px solid rgba(255,255,255,0.08)',
-                          borderRadius: '6px',
-                          padding: '0.55rem',
-                          color: 'var(--text-primary)',
-                          fontSize: '0.85rem',
-                          outline: 'none'
-                        }}
-                      >
-                        <option value="">Select Gender</option>
-                        <option value="Male">Male</option>
-                        <option value="Female">Female</option>
-                        <option value="Other">Other</option>
-                      </select>
+                      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '1rem' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                          <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Suspect Address</label>
+                          <input
+                            type="text"
+                            value={suspect.address}
+                            onChange={e => updateSuspect(index, 'address', e.target.value)}
+                            required
+                            placeholder="e.g. Gokula Road, Hubballi"
+                            style={{
+                              background: 'rgba(0,0,0,0.25)',
+                              border: '1px solid rgba(255,255,255,0.08)',
+                              borderRadius: '6px',
+                              padding: '0.55rem',
+                              color: 'var(--text-primary)',
+                              fontSize: '0.85rem',
+                              outline: 'none'
+                            }}
+                          />
+                        </div>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                          <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Suspect Gender</label>
+                          <select
+                            className="report-select"
+                            value={suspect.gender}
+                            onChange={e => updateSuspect(index, 'gender', e.target.value)}
+                            style={{
+                              background: 'rgba(0,0,0,0.25)',
+                              border: '1px solid rgba(255,255,255,0.08)',
+                              borderRadius: '6px',
+                              padding: '0.55rem',
+                              color: 'var(--text-primary)',
+                              fontSize: '0.85rem',
+                              outline: 'none',
+                              width: '100%'
+                            }}
+                          >
+                            <option value="">Select Gender</option>
+                            <option value="Male">Male</option>
+                            <option value="Female">Female</option>
+                            <option value="Other">Other</option>
+                          </select>
+                        </div>
+                      </div>
                     </div>
-                  </div>
+                  ))}
                 </div>
               </GlassPanel>
 

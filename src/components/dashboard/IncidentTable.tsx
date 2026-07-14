@@ -131,7 +131,7 @@ export default function IncidentTable() {
             <tbody>
               {currentItems.map(inc => {
                 const district = MOCK_DISTRICTS[inc.districtId] || { name: inc.districtId };
-                const offender = offenders.find(o => o.id === inc.offenderId);
+                const suspectsList = inc.accusedSuspects || [];
 
                 return (
                   <tr key={inc.id}>
@@ -147,16 +147,31 @@ export default function IncidentTable() {
                       {formatTimestamp(inc.timestamp)}
                     </td>
                     <td>
-                      {offender ? (
-                        <button
-                          className="btn-link"
-                          style={{ border: 'none', background: 'none', cursor: 'pointer', textAlign: 'left', fontWeight: 'bold' }}
-                          onClick={() => setSelectedOffenderId(offender.id)}
-                        >
-                          {offender.name} ({offender.alias})
-                        </button>
-                      ) : (
+                      {suspectsList.length === 0 ? (
                         <span style={{ color: 'var(--text-dark)', fontStyle: 'italic' }}>Unassigned</span>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                          {suspectsList.map((suspect: any, idx: number) => {
+                            const offender = offenders.find(o => o.name.toLowerCase() === suspect.name.toLowerCase());
+                            if (offender) {
+                              return (
+                                <button
+                                  key={idx}
+                                  className="btn-link"
+                                  style={{ border: 'none', background: 'none', cursor: 'pointer', textAlign: 'left', fontWeight: 'bold', padding: 0 }}
+                                  onClick={() => setSelectedOffenderId(offender.id)}
+                                >
+                                  {offender.name} ({offender.alias})
+                                </button>
+                              );
+                            }
+                            return (
+                              <span key={idx} style={{ color: 'var(--text-primary)' }}>
+                                {suspect.name || 'Unknown'}
+                              </span>
+                            );
+                          })}
+                        </div>
                       )}
                     </td>
                     <td>
