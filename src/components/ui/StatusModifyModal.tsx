@@ -5,6 +5,7 @@ import { useApp } from '@/context/AppContext';
 import GlassPanel from './GlassPanel';
 import { X, ChevronRight, ChevronLeft, ShieldCheck, Lock, AlertTriangle, CheckCircle, Edit3, Eye, EyeOff } from 'lucide-react';
 import type { Incident } from '@/lib/data';
+import DateTimePicker from './DateTimePicker';
 
 const RAW_STATUSES = [
   'Open',
@@ -442,11 +443,10 @@ export default function StatusModifyModal({ incident, onClose }: StatusModifyMod
               <div className="sm-field-row">
                 <div className="sm-field-group" style={{ flex: 1 }}>
                   <label className="sm-label">Closure Date <span className="sm-required">*</span></label>
-                  <input
-                    type="datetime-local"
-                    className="sm-input"
+                  <DateTimePicker
                     value={closureDate}
-                    onChange={(e) => setClosureDate(e.target.value)}
+                    onChange={(val) => setClosureDate(val)}
+                    required
                   />
                 </div>
                 <div className="sm-field-group" style={{ flex: 1 }}>

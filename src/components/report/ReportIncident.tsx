@@ -5,6 +5,7 @@ import { useApp } from '@/context/AppContext';
 import { MOCK_DISTRICTS, Incident, Offender } from '@/lib/data';
 import GlassPanel from '../ui/GlassPanel';
 import { FilePlus, ShieldAlert, CheckCircle, RefreshCw, AlertTriangle } from 'lucide-react';
+import DateTimePicker from '../ui/DateTimePicker';
 
 const DISTRICT_STATIONS: Record<string, { name: string; code: string }[]> = {
   "KA_bagalkot": [
@@ -749,20 +750,10 @@ export default function ReportIncident() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
                     <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Date & Time of Occurrence</label>
-                    <input
-                      type="datetime-local"
+                    <DateTimePicker
                       value={dateTime}
-                      onChange={e => setDateTime(e.target.value)}
+                      onChange={val => setDateTime(val)}
                       required
-                      style={{
-                        background: 'rgba(0,0,0,0.25)',
-                        border: '1px solid rgba(255,255,255,0.08)',
-                        borderRadius: '6px',
-                        padding: '0.55rem',
-                        color: 'var(--text-primary)',
-                        fontSize: '0.85rem',
-                        outline: 'none'
-                      }}
                     />
                   </div>
 
@@ -838,7 +829,7 @@ export default function ReportIncident() {
                       <div style={{ fontSize: '0.75rem', fontWeight: 'bold', color: 'var(--text-muted)' }}>
                         Victim #{index + 1}
                       </div>
-                      
+
                       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '1rem' }}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
                           <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Victim Name</label>
@@ -1361,12 +1352,12 @@ export default function ReportIncident() {
                       onChange={e => setChargeSheetFiled(e.target.checked)}
                       style={{ cursor: convictionStatus === 'Open' ? 'not-allowed' : 'pointer', width: '15px', height: '15px' }}
                     />
-                    <label 
-                      htmlFor="chargeSheet" 
-                      style={{ 
-                        fontSize: '0.75rem', 
-                        color: convictionStatus === 'Open' ? 'var(--text-muted)' : 'var(--text-primary)', 
-                        cursor: convictionStatus === 'Open' ? 'not-allowed' : 'pointer' 
+                    <label
+                      htmlFor="chargeSheet"
+                      style={{
+                        fontSize: '0.75rem',
+                        color: convictionStatus === 'Open' ? 'var(--text-muted)' : 'var(--text-primary)',
+                        cursor: convictionStatus === 'Open' ? 'not-allowed' : 'pointer'
                       }}
                     >
                       Charge Sheet Filed in Court under Sec 173 CrPC
