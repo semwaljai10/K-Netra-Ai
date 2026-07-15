@@ -78,12 +78,12 @@ export function adaptRecord(fir: any): any {
   const evidenceDescriptions = (fir.evidence_collected ?? [])
     .map((e: any) => e.description)
     .filter(Boolean)
-    .join('; ');
+    .join('; ') || fir.investigation_data?.evidence_summary || fir.incident_description?.narrative || 'No evidence summary available.';
 
   // Map case_status to a conviction-like status the app understands
   const caseStatus = fir.case_status ?? 'Open';
-  const convictionStatus = mapCaseStatusToConviction(caseStatus);
-  const chargeSheetFiled = caseStatus === 'Charge Sheet Filed';
+  const convictionStatus = fir.legal_outcome?.conviction_status ?? mapCaseStatusToConviction(caseStatus);
+  const chargeSheetFiled = fir.legal_outcome?.charge_sheet_filed ?? (caseStatus === 'Charge Sheet Filed');
 
   // Extract vehicle number from linkable attributes
   const vehicleNumbers = fir.linkable_attributes?.vehicle_numbers ?? [];
@@ -123,7 +123,7 @@ export function adaptRecord(fir: any): any {
     investigation_data: {
       investigating_officer_id: fir.investigating_officer?.officer_id ?? 'N/A',
       police_station: fir.police_station?.name ?? 'N/A',
-      evidence_summary: evidenceDescriptions || 'No evidence summary available.',
+      evidence_summary: evidenceDescriptions,
     },
     geospatial_data: {
       latitude: fir.incident_location?.coordinates?.latitude ?? 12.9716,
@@ -137,6 +137,7 @@ export function adaptRecord(fir: any): any {
     legal_outcome: {
       charge_sheet_filed: chargeSheetFiled,
       conviction_status: convictionStatus,
+      legal_stage: fir.legal_outcome?.legal_stage || caseStatus,
     },
     // Preserve new-schema enrichments for potential future use
     _source: {

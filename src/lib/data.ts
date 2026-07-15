@@ -285,8 +285,8 @@ const getSeverity = (crimeType: string): 'Critical' | 'High' | 'Medium' | 'Low' 
 
 const getStatus = (convictionStatus: string): 'Open' | 'Dispatched' | 'Resolved' => {
   const status = convictionStatus.toLowerCase();
-  if (status.includes("convicted") || status.includes("acquitted") || status.includes("resolved")) return "Resolved";
-  if (status.includes("trial") || status.includes("pending")) return "Dispatched";
+  if (status.includes("convicted") || status.includes("acquitted") || status.includes("resolved") || status.includes("closed")) return "Resolved";
+  if (status.includes("trial") || status.includes("pending") || status.includes("dispatched")) return "Dispatched";
   return "Open";
 };
 

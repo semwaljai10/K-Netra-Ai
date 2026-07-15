@@ -64,7 +64,7 @@ export async function GET(request: Request) {
       const normalUsersObj = [
         {
           username: 'v27022004',
-          password: encryptedPassword,
+          password: encryptPassword('Mumbai4@143'),
           mustChangePassword: false,
           name: 'Officer A. Sharma',
           role: 'Control Room',

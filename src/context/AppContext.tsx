@@ -945,6 +945,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       case 'Closed': return 'Resolved';
       case 'Charge Sheet Filed': return 'Dispatched';
       case 'Transferred': return 'Dispatched';
+      case 'Dispatched': return 'Dispatched';
       case 'Under Investigation': return 'Open';
       case 'Open':
       default: return 'Open';

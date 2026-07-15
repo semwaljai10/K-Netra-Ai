@@ -296,6 +296,16 @@ export default function IncidentModal() {
           {activeTab === 'evidence' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
               
+              {/* Evidence Summary & Findings */}
+              <div style={{ background: 'rgba(59, 130, 246, 0.05)', padding: '0.75rem 1rem', borderRadius: '8px', border: '1px solid rgba(59, 130, 246, 0.15)' }}>
+                <span className="dossier-label" style={{ fontWeight: 600, display: 'block', marginBottom: '0.4rem', color: 'var(--color-blue)' }}>
+                  Evidence Summary & Findings
+                </span>
+                <p style={{ color: 'var(--text-primary)', lineHeight: '1.45', margin: 0, whiteSpace: 'pre-wrap' }}>
+                  {incident.investigation_data?.evidence_summary || 'No evidence summary available.'}
+                </p>
+              </div>
+
               {/* Evidence list */}
               <div>
                 <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '0.9rem', color: 'var(--color-blue)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>

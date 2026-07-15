@@ -330,6 +330,7 @@ export default function ReportIncident() {
   const [officerRank, setOfficerRank] = useState('');
   const [chargeSheetFiled, setChargeSheetFiled] = useState(false);
   const [convictionStatus, setConvictionStatus] = useState('');
+  const [legalStage, setLegalStage] = useState('');
   const [evidenceSummary, setEvidenceSummary] = useState('');
 
   const clearForm = () => {
@@ -350,6 +351,7 @@ export default function ReportIncident() {
     setOfficerRank('');
     setChargeSheetFiled(false);
     setConvictionStatus('');
+    setLegalStage('');
     setEvidenceSummary('');
   };
 
@@ -473,7 +475,8 @@ export default function ReportIncident() {
         },
         legal_outcome: {
           charge_sheet_filed: chargeSheetFiled,
-          conviction_status: convictionStatus
+          conviction_status: convictionStatus,
+          legal_stage: legalStage
         },
         districtId // passed for mapping client states
       };
@@ -481,9 +484,9 @@ export default function ReportIncident() {
       // Determine status from conviction status
       let status: 'Open' | 'Dispatched' | 'Resolved' = 'Open';
       const conv = convictionStatus.toLowerCase();
-      if (conv.includes('convicted') || conv.includes('acquitted') || conv.includes('resolved')) {
+      if (conv === 'closed') {
         status = 'Resolved';
-      } else if (conv.includes('trial') || conv.includes('pending')) {
+      } else if (conv === 'dispatched') {
         status = 'Dispatched';
       }
 
@@ -1219,11 +1222,24 @@ export default function ReportIncident() {
                     </div>
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                      <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Conviction Status / Legal Stage</label>
+                      <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Conviction Status</label>
                       <select
                         className="report-select"
                         value={convictionStatus}
-                        onChange={e => setConvictionStatus(e.target.value)}
+                        onChange={e => {
+                          const val = e.target.value;
+                          setConvictionStatus(val);
+                          if (val === 'Open') {
+                            setLegalStage('Under Investigation');
+                            setChargeSheetFiled(false);
+                          } else if (val === 'Dispatched') {
+                            setLegalStage('Pending Trial');
+                          } else if (val === 'Closed') {
+                            setLegalStage('Convicted');
+                          } else {
+                            setLegalStage('');
+                          }
+                        }}
                         required
                         style={{
                           background: 'rgba(0,0,0,0.25)',
@@ -1236,10 +1252,50 @@ export default function ReportIncident() {
                         }}
                       >
                         <option value="">Select Status</option>
-                        <option value="Under Investigation">Under Investigation</option>
-                        <option value="Pending Trial">Pending Trial</option>
-                        <option value="Convicted">Convicted</option>
-                        <option value="Acquitted">Acquitted</option>
+                        <option value="Open">Open</option>
+                        <option value="Dispatched">Dispatched</option>
+                        <option value="Closed">Closed</option>
+                      </select>
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                      <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Legal Stage</label>
+                      <select
+                        className="report-select"
+                        value={legalStage}
+                        onChange={e => setLegalStage(e.target.value)}
+                        required
+                        style={{
+                          background: 'rgba(0,0,0,0.25)',
+                          border: '1px solid rgba(255,255,255,0.08)',
+                          borderRadius: '6px',
+                          padding: '0.55rem',
+                          color: 'var(--text-primary)',
+                          fontSize: '0.85rem',
+                          outline: 'none'
+                        }}
+                      >
+                        <option value="">Select Stage</option>
+                        {convictionStatus === 'Open' && (
+                          <option value="Under Investigation">Under Investigation</option>
+                        )}
+                        {convictionStatus === 'Dispatched' && (
+                          <option value="Pending Trial">Pending Trial</option>
+                        )}
+                        {convictionStatus === 'Closed' && (
+                          <>
+                            <option value="Convicted">Convicted</option>
+                            <option value="Acquitted">Acquitted</option>
+                          </>
+                        )}
+                        {!convictionStatus && (
+                          <>
+                            <option value="Under Investigation">Under Investigation</option>
+                            <option value="Pending Trial">Pending Trial</option>
+                            <option value="Convicted">Convicted</option>
+                            <option value="Acquitted">Acquitted</option>
+                          </>
+                        )}
                       </select>
                     </div>
 
@@ -1301,10 +1357,18 @@ export default function ReportIncident() {
                       type="checkbox"
                       id="chargeSheet"
                       checked={chargeSheetFiled}
+                      disabled={convictionStatus === 'Open'}
                       onChange={e => setChargeSheetFiled(e.target.checked)}
-                      style={{ cursor: 'pointer', width: '15px', height: '15px' }}
+                      style={{ cursor: convictionStatus === 'Open' ? 'not-allowed' : 'pointer', width: '15px', height: '15px' }}
                     />
-                    <label htmlFor="chargeSheet" style={{ fontSize: '0.75rem', color: 'var(--text-primary)', cursor: 'pointer' }}>
+                    <label 
+                      htmlFor="chargeSheet" 
+                      style={{ 
+                        fontSize: '0.75rem', 
+                        color: convictionStatus === 'Open' ? 'var(--text-muted)' : 'var(--text-primary)', 
+                        cursor: convictionStatus === 'Open' ? 'not-allowed' : 'pointer' 
+                      }}
+                    >
                       Charge Sheet Filed in Court under Sec 173 CrPC
                     </label>
                   </div>

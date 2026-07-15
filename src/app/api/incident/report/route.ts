@@ -287,6 +287,9 @@ export async function POST(request: Request) {
         designation: rawCase.investigation_data?.investigating_officer_rank || 'Sub-Inspector of Police (SI)',
         contact: null
       },
+      investigation_data: {
+        evidence_summary: rawCase.investigation_data?.evidence_summary || ''
+      },
       complainant: {
         name: rawCase.victim_details?.name || victimsInput[0]?.name || 'Unknown',
         age: parseAgeValue(rawCase.victim_details?.age || victimsInput[0]?.age),
@@ -333,7 +336,18 @@ export async function POST(request: Request) {
       },
       witnesses: [],
       evidence_collected: [],
-      case_status: 'Open',
+      case_status: (() => {
+        const postConv = rawCase.legal_outcome?.conviction_status;
+        const postCharge = rawCase.legal_outcome?.charge_sheet_filed;
+        if (postConv === 'Closed') return 'Closed';
+        if (postConv === 'Dispatched') return postCharge ? 'Charge Sheet Filed' : 'Transferred';
+        return 'Open';
+      })(),
+      legal_outcome: {
+        charge_sheet_filed: rawCase.legal_outcome?.charge_sheet_filed || false,
+        conviction_status: rawCase.legal_outcome?.conviction_status || 'Open',
+        legal_stage: rawCase.legal_outcome?.legal_stage || 'Under Investigation'
+      },
       linkable_attributes: {
         vehicle_numbers: rawCase.incident_data?.vehicle_no && rawCase.incident_data.vehicle_no !== 'None'
           ? [rawCase.incident_data.vehicle_no] : null,
@@ -369,6 +383,9 @@ export async function POST(request: Request) {
       closure_details: null
     };
 
+    // Determine dbCaseStatus
+    const dbCaseStatus = newFirRecord.case_status;
+
     // Insert into Supabase if configured, otherwise simulate success
     let finalRecord = null;
     if (isSupabaseConfigured()) {
@@ -376,7 +393,7 @@ export async function POST(request: Request) {
         .from('fir_records')
         .insert({
           fir_number: nextFirNumber,
-          case_status: 'Open',
+          case_status: dbCaseStatus,
           district,
           crime_type: crimeType,
           severity: getSeverity(crimeType),
@@ -397,7 +414,7 @@ export async function POST(request: Request) {
       console.log('[SUPABASE] Not configured. Simulating successful incident insert.');
       finalRecord = {
         fir_number: nextFirNumber,
-        case_status: 'Open',
+        case_status: dbCaseStatus,
         district,
         crime_type: crimeType,
         severity: getSeverity(crimeType),
