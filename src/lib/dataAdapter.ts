@@ -171,6 +171,7 @@ export function adaptRecord(fir: any): any {
       contactEmail: fir.complainant.contact_email || fir.complainant.contactEmail,
       idType: fir.complainant.id_type || fir.complainant.idType,
       idNumber: fir.complainant.id_number || fir.complainant.idNumber,
+      relationshipToVictim: fir.complainant.relationship_to_victim || fir.complainant.relationshipToVictim || null,
     } : undefined,
     accusedSuspects: fir.accused_suspects ?? [],
     victims: fir.victims ?? [],

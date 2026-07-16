@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { ChevronLeft, ChevronRight, Calendar, X } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 
 interface DateTimePickerProps {
@@ -10,6 +11,7 @@ interface DateTimePickerProps {
   placeholder?: string;
   required?: boolean;
   disabled?: boolean;
+  inline?: boolean;
 }
 
 export default function DateTimePicker({
@@ -18,9 +20,16 @@ export default function DateTimePicker({
   placeholder = 'Select Date & Time',
   required = false,
   disabled = false,
+  inline = false,
 }: DateTimePickerProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const [activeTimeMode, setActiveTimeMode] = useState<'hour' | 'minute'>('hour');
+
+  useEffect(() => {
+    setMounted(true);
+    return () => setMounted(false);
+  }, []);
   
   // Local typable state variables for hours/minutes
   const [hourInputVal, setHourInputVal] = useState('');
@@ -104,7 +113,13 @@ export default function DateTimePicker({
   // Click outside to close dropdown listener
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+      if (inline) return;
+      const target = e.target as HTMLElement;
+      
+      const isInsideInput = containerRef.current && containerRef.current.contains(target);
+      const isInsidePortal = target.closest('.datetime-picker-portal-modal');
+      
+      if (!isInsideInput && !isInsidePortal) {
         setIsOpen(false);
       }
     };
@@ -112,7 +127,7 @@ export default function DateTimePicker({
       document.addEventListener('mousedown', handleClickOutside);
     }
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [isOpen]);
+  }, [isOpen, inline]);
 
   // Format Date to YYYY-MM-DDTHH:MM (local time format for native inputs compatibility)
   const formatLocalValue = (date: Date): string => {
@@ -471,365 +486,311 @@ export default function DateTimePicker({
   const formattedDayStr = `${dayNames[selectedDate.getDay()]}, `;
   const formattedMonthStr = `${shortMonths[selectedDate.getMonth()]} ${selectedDate.getDate()}`;
 
-  return (
-    <div ref={containerRef} style={{ position: 'relative', width: '100%' }}>
-      {/* Target Input Field Display */}
-      <div 
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          background: themeColors.inputBg,
-          border: `1px solid ${themeColors.inputBorder}`,
-          borderRadius: '6px',
-          padding: '0.55rem',
-          cursor: disabled ? 'not-allowed' : 'pointer',
-          opacity: disabled ? 0.65 : 1,
-          justifyContent: 'space-between',
-          transition: 'all 0.2s',
-        }}
-        onClick={() => !disabled && setIsOpen(!isOpen)}
-        onMouseEnter={(e) => {
-          if (!disabled) e.currentTarget.style.borderColor = themeColors.activeAccent;
-        }}
-        onMouseLeave={(e) => {
-          if (!disabled) e.currentTarget.style.borderColor = themeColors.inputBorder;
-        }}
-      >
-        <span style={{ 
-          fontSize: '0.85rem', 
-          color: value ? themeColors.inputText : themeColors.inputPlaceholder,
-          userSelect: 'none'
-        }}>
-          {value ? formatDisplayValue(value) : placeholder}
-        </span>
-        <Calendar size={15} style={{ color: themeColors.textMuted, flexShrink: 0 }} />
-      </div>
 
-      {required && !value && (
-        <input 
-          tabIndex={-1} 
-          required 
-          value="" 
-          onChange={() => {}} 
-          style={{ opacity: 0, height: 0, width: 0, position: 'absolute', pointerEvents: 'none' }} 
-        />
-      )}
 
-      {/* Unified Side-by-Side Dual Panel (Calendar & Analog Clock) */}
-      {isOpen && (
-        <div 
-          className="animate-zoom"
-          style={{
-            position: 'absolute',
-            top: 'calc(100% + 5px)',
-            left: 0,
-            zIndex: 1000,
-            width: '540px', // Spacious side-by-side layout
-            background: themeColors.panelBg,
-            border: `1px solid ${themeColors.panelBorder}`,
-            borderRadius: '20px', // High rounded corners matching image
-            boxShadow: themeColors.panelShadow,
-            display: 'flex',
-            overflow: 'hidden',
-            fontFamily: 'system-ui, -apple-system, sans-serif',
-            userSelect: 'none',
-            backdropFilter: 'blur(20px)',
-            WebkitBackdropFilter: 'blur(20px)',
-          }}
-        >
-          {/* Left Panel: Calendar */}
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '0.5rem 0.5rem 1rem 1rem' }}>
+  const renderPanelContent = () => {
+    return (
+      <>
+        {/* Left Panel: Calendar */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: inline ? '0.5rem' : '0.5rem 0.5rem 1rem 1rem' }}>
+          
+          {/* Header: Month / Year */}
+          <div style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'space-between', 
+            padding: '0.9rem 0.5rem 0.9rem 0',
+          }}>
+            <button
+              type="button"
+              onClick={handlePrevMonth}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: themeColors.textMuted,
+                cursor: 'pointer',
+                padding: '0.2rem',
+                display: 'flex',
+                alignItems: 'center',
+                outline: 'none'
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.color = themeColors.textPrimary}
+              onMouseLeave={(e) => e.currentTarget.style.color = themeColors.textMuted}
+            >
+              <ChevronLeft size={18} />
+            </button>
             
-            {/* Header: Month / Year */}
-            <div style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              justifyContent: 'space-between', 
-              padding: '0.9rem 0.5rem 0.9rem 0',
+            <span style={{ 
+              fontSize: '0.88rem', 
+              fontWeight: '700', 
+              color: themeColors.activeAccent, // Cyan Month title as shown in mockup
+              letterSpacing: '1.2px',
             }}>
-              <button
-                type="button"
-                onClick={handlePrevMonth}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  color: themeColors.textMuted,
-                  cursor: 'pointer',
-                  padding: '0.2rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  outline: 'none'
-                }}
-                onMouseEnter={(e) => e.currentTarget.style.color = themeColors.textPrimary}
-                onMouseLeave={(e) => e.currentTarget.style.color = themeColors.textMuted}
-              >
-                <ChevronLeft size={18} />
-              </button>
-              
-              <span style={{ 
-                fontSize: '0.88rem', 
-                fontWeight: '700', 
-                color: themeColors.activeAccent, // Cyan Month title as shown in mockup
-                letterSpacing: '1.2px',
-              }}>
-                {monthsList[month]} {year}
-              </span>
+              {monthsList[month]} {year}
+            </span>
 
-              <button
-                type="button"
-                onClick={handleNextMonth}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  color: themeColors.textMuted,
-                  cursor: 'pointer',
-                  padding: '0.2rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  outline: 'none'
-                }}
-                onMouseEnter={(e) => e.currentTarget.style.color = themeColors.textPrimary}
-                onMouseLeave={(e) => e.currentTarget.style.color = themeColors.textMuted}
-              >
-                <ChevronRight size={18} />
-              </button>
-            </div>
-
-            {/* Weekdays Row */}
-            <div style={{ 
-              display: 'grid', 
-              gridTemplateColumns: 'repeat(7, 1fr)', 
-              marginBottom: '4px'
-            }}>
-              {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((dName, idx) => (
-                <div 
-                  key={`day-header-${idx}`} 
-                  style={{ 
-                    fontSize: '0.75rem', 
-                    color: themeColors.textMuted, 
-                    textAlign: 'center',
-                    fontWeight: '600',
-                    padding: '0.5rem 0',
-                  }}
-                >
-                  {dName}
-                </div>
-              ))}
-            </div>
-
-            {/* Grid Line Separator */}
-            <div style={{ height: '1px', background: themeColors.gridLineColor, width: '100%', marginBottom: '4px' }} />
-
-            {/* Calendar grid box */}
-            <div style={{ 
-              display: 'grid', 
-              gridTemplateColumns: 'repeat(7, 1fr)', 
-              background: 'transparent',
-              borderLeft: `1px solid ${themeColors.gridLineColor}`,
-              borderTop: `1px solid ${themeColors.gridLineColor}`,
-            }}>
-              {renderCalendarDays()}
-            </div>
-
+            <button
+              type="button"
+              onClick={handleNextMonth}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: themeColors.textMuted,
+                cursor: 'pointer',
+                padding: '0.2rem',
+                display: 'flex',
+                alignItems: 'center',
+                outline: 'none'
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.color = themeColors.textPrimary}
+              onMouseLeave={(e) => e.currentTarget.style.color = themeColors.textMuted}
+            >
+              <ChevronRight size={18} />
+            </button>
           </div>
 
-          {/* Center Divider line */}
-          <div style={{ width: '1px', background: themeColors.divider, alignSelf: 'stretch' }} />
-
-          {/* Right Panel: Analog Clock */}
+          {/* Weekdays Row */}
           <div style={{ 
-            flex: 1, 
-            display: 'flex', 
-            flexDirection: 'column', 
-            alignItems: 'center', 
-            justifyContent: 'center',
-            padding: '1.5rem 1rem',
-            position: 'relative'
+            display: 'grid', 
+            gridTemplateColumns: 'repeat(7, 1fr)', 
+            marginBottom: '4px'
           }}>
-            {/* SVG Analog Clock Face */}
-            <svg 
-              ref={clockFaceRef}
-              width="190" 
-              height="190" 
-              style={{ cursor: 'pointer', filter: isLight ? 'none' : 'drop-shadow(0 0 8px rgba(0, 240, 255, 0.15))' }}
-              onClick={handleClockClick}
-            >
-              {/* Outer Cyan Ring */}
-              <circle 
-                cx="95" 
-                cy="95" 
-                r="82" 
-                fill="rgba(0,0,0,0.1)" 
-                stroke={themeColors.activeAccent} 
-                strokeWidth="2.5" 
-              />
-              
-              {/* Dial Ticks */}
-              {Array.from({ length: 60 }).map((_, i) => {
-                const angleRad = (i * 6) * Math.PI / 180;
-                const isHour = i % 5 === 0;
-                const tickLen = isHour ? 8 : 4;
-                const startR = 82 - tickLen;
-                const endR = 80;
-
-                const x1 = 95 + startR * Math.cos(angleRad);
-                const y1 = 95 + startR * Math.sin(angleRad);
-                const x2 = 95 + endR * Math.cos(angleRad);
-                const y2 = 95 + endR * Math.sin(angleRad);
-
-                return (
-                  <line 
-                    key={`tick-${i}`}
-                    x1={x1} 
-                    y1={y1} 
-                    x2={x2} 
-                    y2={y2} 
-                    stroke={isHour ? themeColors.textPrimary : themeColors.textMuted} 
-                    strokeWidth={isHour ? '1.5' : '0.8'}
-                    opacity={isHour ? 0.75 : 0.4}
-                  />
-                );
-              })}
-
-              {/* Hour Hand */}
-              <line 
-                x1="95" 
-                y1="95" 
-                x2={95 + 40 * Math.cos(hourAngle * Math.PI / 180)} 
-                y2={95 + 40 * Math.sin(hourAngle * Math.PI / 180)} 
-                stroke={themeColors.activeAccent} 
-                strokeWidth="5" 
-                strokeLinecap="round"
-              />
-
-              {/* Minute Hand */}
-              <line 
-                x1="95" 
-                y1="95" 
-                x2={95 + 60 * Math.cos(minuteAngle * Math.PI / 180)} 
-                y2={95 + 60 * Math.sin(minuteAngle * Math.PI / 180)} 
-                stroke={themeColors.activeAccent} 
-                strokeWidth="3" 
-                strokeLinecap="round"
-              />
-
-              {/* Center Pivot Pin */}
-              <circle 
-                cx="95" 
-                cy="95" 
-                r="4.5" 
-                fill="#ffffff" 
-                stroke={themeColors.activeAccent} 
-                strokeWidth="1.5"
-              />
-            </svg>
-
-            {/* Interactive Digital Display Area */}
-            <div style={{ marginTop: '1.25rem', textAlign: 'center' }}>
-              
-              {/* Digital Time readout: now featuring styled text input fields */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.15rem' }}>
-                <input
-                  type="text"
-                  value={hourInputVal}
-                  onChange={handleHourInputChange}
-                  onBlur={handleHourInputBlur}
-                  style={{
-                    background: 'transparent',
-                    border: 'none',
-                    outline: 'none',
-                    padding: 0,
-                    fontFamily: 'inherit',
-                    fontSize: '1.75rem',
-                    fontWeight: '700',
-                    color: activeTimeMode === 'hour' ? themeColors.activeAccent : themeColors.textPrimary,
-                    width: '45px',
-                    textAlign: 'center',
-                    caretColor: themeColors.activeAccent,
-                    transition: 'color 0.15s ease'
-                  }}
-                  onClick={() => setActiveTimeMode('hour')}
-                />
-                
-                <span style={{ fontSize: '1.65rem', fontWeight: '700', color: themeColors.textPrimary }}>:</span>
-                
-                <input
-                  type="text"
-                  value={minuteInputVal}
-                  onChange={handleMinuteInputChange}
-                  onBlur={handleMinuteInputBlur}
-                  style={{
-                    background: 'transparent',
-                    border: 'none',
-                    outline: 'none',
-                    padding: 0,
-                    fontFamily: 'inherit',
-                    fontSize: '1.75rem',
-                    fontWeight: '700',
-                    color: activeTimeMode === 'minute' ? themeColors.activeAccent : themeColors.textPrimary,
-                    width: '45px',
-                    textAlign: 'center',
-                    caretColor: themeColors.activeAccent,
-                    transition: 'color 0.15s ease'
-                  }}
-                  onClick={() => setActiveTimeMode('minute')}
-                />
-
-                {/* AM & PM side-by-side toggles with highlighted active states */}
-                <div style={{ display: 'flex', gap: '0.25rem', marginLeft: '0.5rem' }}>
-                  <button
-                    type="button"
-                    onClick={() => selectAmPm('AM')}
-                    style={{
-                      fontSize: '0.85rem',
-                      fontWeight: displayAmPm === 'AM' ? '800' : '500',
-                      color: displayAmPm === 'AM' ? themeColors.activeAccent : themeColors.textMuted,
-                      background: 'transparent',
-                      border: 'none',
-                      padding: '0.2rem 0.3rem',
-                      cursor: 'pointer',
-                      outline: 'none',
-                      textShadow: displayAmPm === 'AM' ? `0 0 10px ${themeColors.activeAccentGlow}` : 'none',
-                      transition: 'all 0.15s ease',
-                    }}
-                  >
-                    AM
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => selectAmPm('PM')}
-                    style={{
-                      fontSize: '0.85rem',
-                      fontWeight: displayAmPm === 'PM' ? '800' : '500',
-                      color: displayAmPm === 'PM' ? themeColors.activeAccent : themeColors.textMuted,
-                      background: 'transparent',
-                      border: 'none',
-                      padding: '0.2rem 0.3rem',
-                      cursor: 'pointer',
-                      outline: 'none',
-                      textShadow: displayAmPm === 'PM' ? `0 0 10px ${themeColors.activeAccentGlow}` : 'none',
-                      transition: 'all 0.15s ease',
-                    }}
-                  >
-                    PM
-                  </button>
-                </div>
+            {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((dName, idx) => (
+              <div 
+                key={`day-header-${idx}`} 
+                style={{ 
+                  fontSize: '0.75rem', 
+                  color: themeColors.textMuted, 
+                  textAlign: 'center',
+                  fontWeight: '600',
+                  padding: '0.5rem 0',
+                }}
+              >
+                {dName}
               </div>
+            ))}
+          </div>
 
-              {/* Day Date Text line: THURSDAY, NOV 16 */}
-              <div style={{ 
-                fontSize: '0.78rem', 
-                fontWeight: '600', 
-                color: themeColors.textMuted, 
-                marginTop: '0.25rem',
-                letterSpacing: '0.5px'
-              }}>
-                {formattedDayStr}
-                <span style={{ color: themeColors.activeAccent }}>{formattedMonthStr}</span>
+          {/* Grid Line Separator */}
+          <div style={{ height: '1px', background: themeColors.gridLineColor, width: '100%', marginBottom: '4px' }} />
+
+          {/* Calendar grid box */}
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: 'repeat(7, 1fr)', 
+            background: 'transparent',
+            borderLeft: `1px solid ${themeColors.gridLineColor}`,
+            borderTop: `1px solid ${themeColors.gridLineColor}`,
+          }}>
+            {renderCalendarDays()}
+          </div>
+
+        </div>
+
+        {/* Center Divider line */}
+        <div style={{ 
+          width: inline ? '100%' : '1px', 
+          height: inline ? '1px' : 'auto', 
+          background: themeColors.divider, 
+          alignSelf: inline ? 'auto' : 'stretch' 
+        }} />
+
+        {/* Right Panel: Analog Clock */}
+        <div style={{ 
+          flex: 1, 
+          display: 'flex', 
+          flexDirection: 'column', 
+          alignItems: 'center', 
+          justifyContent: 'center',
+          padding: '1.5rem 1rem',
+          position: 'relative'
+        }}>
+          {/* SVG Analog Clock Face */}
+          <svg 
+            ref={clockFaceRef}
+            viewBox="0 0 190 190"
+            width="135" 
+            height="135" 
+            style={{ cursor: 'pointer', filter: isLight ? 'none' : 'drop-shadow(0 0 8px rgba(0, 240, 255, 0.15))' }}
+            onClick={handleClockClick}
+          >
+            {/* Outer Cyan Ring */}
+            <circle 
+              cx="95" 
+              cy="95" 
+              r="82" 
+              fill="rgba(0,0,0,0.1)" 
+              stroke={themeColors.activeAccent} 
+              strokeWidth="2.5" 
+            />
+            
+            {/* Dial Ticks */}
+            {Array.from({ length: 60 }).map((_, i) => {
+              const angleRad = (i * 6) * Math.PI / 180;
+              const isHour = i % 5 === 0;
+              const tickLen = isHour ? 8 : 4;
+              const startR = 82 - tickLen;
+              const endR = 80;
+
+              const x1 = 95 + startR * Math.cos(angleRad);
+              const y1 = 95 + startR * Math.sin(angleRad);
+              const x2 = 95 + endR * Math.cos(angleRad);
+              const y2 = 95 + endR * Math.sin(angleRad);
+
+              return (
+                <line 
+                  key={`tick-${i}`}
+                  x1={x1} 
+                  y1={y1} 
+                  x2={x2} 
+                  y2={y2} 
+                  stroke={isHour ? themeColors.textPrimary : themeColors.textMuted} 
+                  strokeWidth={isHour ? '1.5' : '0.8'}
+                  opacity={isHour ? 0.75 : 0.4}
+                />
+              );
+            })}
+
+            {/* Hour Hand */}
+            <line 
+              x1="95" 
+              y1="95" 
+              x2={95 + 40 * Math.cos(hourAngle * Math.PI / 180)} 
+              y2={95 + 40 * Math.sin(hourAngle * Math.PI / 180)} 
+              stroke={themeColors.activeAccent} 
+              strokeWidth="5" 
+              strokeLinecap="round"
+            />
+
+            {/* Minute Hand */}
+            <line 
+              x1="95" 
+              y1="95" 
+              x2={95 + 60 * Math.cos(minuteAngle * Math.PI / 180)} 
+              y2={95 + 60 * Math.sin(minuteAngle * Math.PI / 180)} 
+              stroke={themeColors.activeAccent} 
+              strokeWidth="3" 
+              strokeLinecap="round"
+            />
+
+            {/* Center Pivot Pin */}
+            <circle 
+              cx="95" 
+              cy="95" 
+              r="4.5" 
+              fill="#ffffff" 
+              stroke={themeColors.activeAccent} 
+              strokeWidth="1.5"
+            />
+          </svg>
+
+          {/* Interactive Digital Display Area */}
+          <div style={{ marginTop: '1.25rem', textAlign: 'center' }}>
+            
+            {/* Digital Time readout: now featuring styled text input fields */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.15rem' }}>
+              <input
+                type="text"
+                value={hourInputVal}
+                onChange={handleHourInputChange}
+                onBlur={handleHourInputBlur}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  outline: 'none',
+                  padding: 0,
+                  fontFamily: 'inherit',
+                  fontSize: '1.45rem',
+                  fontWeight: '700',
+                  color: activeTimeMode === 'hour' ? themeColors.activeAccent : themeColors.textPrimary,
+                  width: '35px',
+                  textAlign: 'center',
+                  caretColor: themeColors.activeAccent,
+                  transition: 'color 0.15s ease'
+                }}
+                onClick={() => setActiveTimeMode('hour')}
+              />
+              
+              <span style={{ fontSize: '1.35rem', fontWeight: '700', color: themeColors.textPrimary }}>:</span>
+              
+              <input
+                type="text"
+                value={minuteInputVal}
+                onChange={handleMinuteInputChange}
+                onBlur={handleMinuteInputBlur}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  outline: 'none',
+                  padding: 0,
+                  fontFamily: 'inherit',
+                  fontSize: '1.45rem',
+                  fontWeight: '700',
+                  color: activeTimeMode === 'minute' ? themeColors.activeAccent : themeColors.textPrimary,
+                  width: '35px',
+                  textAlign: 'center',
+                  caretColor: themeColors.activeAccent,
+                  transition: 'color 0.15s ease'
+                }}
+                onClick={() => setActiveTimeMode('minute')}
+              />
+
+              {/* AM & PM side-by-side toggles with highlighted active states */}
+              <div style={{ display: 'flex', gap: '0.25rem', marginLeft: '0.5rem' }}>
+                <button
+                  type="button"
+                  onClick={() => selectAmPm('AM')}
+                  style={{
+                    fontSize: '0.85rem',
+                    fontWeight: displayAmPm === 'AM' ? '800' : '500',
+                    color: displayAmPm === 'AM' ? themeColors.activeAccent : themeColors.textMuted,
+                    background: 'transparent',
+                    border: 'none',
+                    padding: '0.2rem 0.3rem',
+                    cursor: 'pointer',
+                    outline: 'none',
+                    textShadow: displayAmPm === 'AM' ? `0 0 10px ${themeColors.activeAccentGlow}` : 'none',
+                    transition: 'all 0.15s ease',
+                  }}
+                >
+                  AM
+                </button>
+                <button
+                  type="button"
+                  onClick={() => selectAmPm('PM')}
+                  style={{
+                    fontSize: '0.85rem',
+                    fontWeight: displayAmPm === 'PM' ? '800' : '500',
+                    color: displayAmPm === 'PM' ? themeColors.activeAccent : themeColors.textMuted,
+                    background: 'transparent',
+                    border: 'none',
+                    padding: '0.2rem 0.3rem',
+                    cursor: 'pointer',
+                    outline: 'none',
+                    textShadow: displayAmPm === 'PM' ? `0 0 10px ${themeColors.activeAccentGlow}` : 'none',
+                    transition: 'all 0.15s ease',
+                  }}
+                >
+                  PM
+                </button>
               </div>
             </div>
 
-            {/* Quick action buttons & Confirm */}
+            {/* Day Date Text line: THURSDAY, NOV 16 */}
+            <div style={{ 
+              fontSize: '0.78rem', 
+              fontWeight: '600', 
+              color: themeColors.textMuted, 
+              marginTop: '0.25rem',
+              letterSpacing: '0.5px'
+            }}>
+              {formattedDayStr}
+              <span style={{ color: themeColors.activeAccent }}>{formattedMonthStr}</span>
+            </div>
+          </div>
+
+          {/* Quick action buttons & Confirm */}
+          {!inline && (
             <div style={{ 
               display: 'flex', 
               width: '100%', 
@@ -900,10 +861,153 @@ export default function DateTimePicker({
                 CONFIRM
               </button>
             </div>
-
-          </div>
+          )}
 
         </div>
+      </>
+    );
+  };
+
+  return (
+    <div ref={containerRef} style={{ position: 'relative', width: '100%' }}>
+      {/* Target Input Field Display */}
+      {!inline && (
+        <div 
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            background: themeColors.inputBg,
+            border: `1px solid ${themeColors.inputBorder}`,
+            borderRadius: '6px',
+            padding: '0.55rem',
+            cursor: disabled ? 'not-allowed' : 'pointer',
+            opacity: disabled ? 0.65 : 1,
+            justifyContent: 'space-between',
+            transition: 'all 0.2s',
+          }}
+          onClick={() => !disabled && setIsOpen(!isOpen)}
+          onMouseEnter={(e) => {
+            if (!disabled) e.currentTarget.style.borderColor = themeColors.activeAccent;
+          }}
+          onMouseLeave={(e) => {
+            if (!disabled) e.currentTarget.style.borderColor = themeColors.inputBorder;
+          }}
+        >
+          <span style={{ 
+            fontSize: '0.85rem', 
+            color: value ? themeColors.inputText : themeColors.inputPlaceholder,
+            userSelect: 'none'
+          }}>
+            {value ? formatDisplayValue(value) : placeholder}
+          </span>
+          <Calendar size={15} style={{ color: themeColors.textMuted, flexShrink: 0 }} />
+        </div>
+      )}
+
+      {required && !value && !inline && (
+        <input 
+          tabIndex={-1} 
+          required 
+          value="" 
+          onChange={() => {}} 
+          style={{ opacity: 0, height: 0, width: 0, position: 'absolute', pointerEvents: 'none' }} 
+        />
+      )}
+
+      {/* Unified Side-by-Side Dual Panel (Calendar & Analog Clock) */}
+      {inline ? (
+        <div 
+          style={{
+            position: 'relative',
+            width: '100%',
+            background: 'transparent',
+            border: 'none',
+            borderRadius: 0,
+            boxShadow: 'none',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+            fontFamily: 'system-ui, -apple-system, sans-serif',
+            userSelect: 'none',
+          }}
+        >
+          {renderPanelContent()}
+        </div>
+      ) : (
+        isOpen && mounted && createPortal(
+          /* Render as centered viewport modal popup via React Portal */
+          <div 
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              width: '100vw',
+              height: '100vh',
+              background: 'rgba(6, 10, 18, 0.65)',
+              backdropFilter: 'blur(4px)',
+              zIndex: 9999, // Stay above everything
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+            onClick={() => setIsOpen(false)}
+          >
+            <div 
+              className="datetime-picker-portal-modal animate-zoom"
+              onClick={e => e.stopPropagation()}
+              style={{
+                position: 'relative',
+                width: '430px',
+                background: themeColors.panelBg,
+                border: `1px solid ${themeColors.panelBorder}`,
+                borderRadius: '16px',
+                boxShadow: themeColors.panelShadow,
+                display: 'flex',
+                overflow: 'hidden',
+                fontFamily: 'system-ui, -apple-system, sans-serif',
+                userSelect: 'none',
+                backdropFilter: 'blur(20px)',
+                WebkitBackdropFilter: 'blur(20px)',
+                paddingTop: '0.5rem'
+              }}
+            >
+              {/* Close Button X on Top Right */}
+              <button
+                type="button"
+                onClick={() => setIsOpen(false)}
+                style={{
+                  position: 'absolute',
+                  top: '12px',
+                  right: '12px',
+                  background: 'transparent',
+                  border: 'none',
+                  color: themeColors.textMuted,
+                  cursor: 'pointer',
+                  padding: '4px',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.2s',
+                  zIndex: 100
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.color = '#ef4444';
+                  e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)';
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.color = themeColors.textMuted;
+                  e.currentTarget.style.background = 'transparent';
+                }}
+              >
+                <X size={16} />
+              </button>
+
+              {renderPanelContent()}
+            </div>
+          </div>,
+          document.body
+        )
       )}
     </div>
   );

@@ -84,11 +84,11 @@ export function generateFIRPDF(incidentId: string, customCaseData?: any) {
   // Dynamic Y-coordinate layout starting at 104
   let currentY = 104;
 
-  // Section 4: Complainant / Victim
+  // Section 4: Complainant Details
   doc.setFont("helvetica", "bold");
   doc.setFontSize(10);
   doc.setTextColor(20, 50, 100);
-  doc.text("4. COMPLAINANT / VICTIM DETAILS", 12, currentY);
+  doc.text("4. COMPLAINANT DETAILS", 12, currentY);
   currentY += 6;
   
   doc.setFont("helvetica", "normal");
@@ -100,6 +100,40 @@ export function generateFIRPDF(incidentId: string, customCaseData?: any) {
                       (caseData._source?.all_victims && caseData._source.all_victims.length > 0) ? caseData._source.all_victims :
                       (caseData._source?.victims && caseData._source.victims.length > 0) ? caseData._source.victims :
                       (caseData.victim_details ? [caseData.victim_details] : []);
+
+  const comp = caseData.complainant || caseData._source?.complainant || {};
+  const compName = comp.name || (victimsList[0]?.name || 'Unknown');
+  const compAge = comp.age || (victimsList[0]?.age || 'N/A');
+  const compGender = comp.gender || (victimsList[0]?.gender || 'N/A');
+  const compRel = comp.relationshipToVictim || comp.relationship_to_victim || 'Self';
+  const compPhone = comp.contactPhone || comp.contact_phone || 'N/A';
+  const compId = comp.idType ? `${comp.idType} (${comp.idNumber})` : 'N/A';
+  const compAddr = comp.address || 'N/A';
+
+  doc.text(`Name: ${compName}`, 15, currentY);
+  doc.text(`Age / Gender: ${compAge} / ${compGender}`, 110, currentY);
+  currentY += 5;
+  doc.text(`Relationship to Victim: ${compRel}`, 15, currentY);
+  doc.text(`Phone: ${compPhone}`, 110, currentY);
+  currentY += 5;
+  doc.text(`Identification: ${compId}`, 15, currentY);
+  currentY += 5;
+  doc.text(`Address: ${compAddr}`, 15, currentY);
+  currentY += 6;
+
+  doc.line(10, currentY, 200, currentY);
+  currentY += 6;
+
+  // Section 4b: Victim Details
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.setTextColor(20, 50, 100);
+  doc.text("4B. VICTIM DETAILS", 12, currentY);
+  currentY += 6;
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.setTextColor(30, 30, 30);
 
   if (victimsList.length === 0) {
     doc.text("No victims listed in FIR.", 15, currentY);

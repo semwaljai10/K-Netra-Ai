@@ -291,14 +291,15 @@ export async function POST(request: Request) {
         evidence_summary: rawCase.investigation_data?.evidence_summary || ''
       },
       complainant: {
-        name: rawCase.victim_details?.name || victimsInput[0]?.name || 'Unknown',
-        age: parseAgeValue(rawCase.victim_details?.age || victimsInput[0]?.age),
-        gender: rawCase.victim_details?.gender || victimsInput[0]?.gender || null,
-        address: null,
-        contact_phone: null,
-        contact_email: null,
-        id_type: null,
-        id_number: null
+        name: rawCase.complainant?.name || rawCase.victim_details?.name || victimsInput[0]?.name || 'Unknown',
+        age: parseAgeValue(rawCase.complainant?.age !== undefined && rawCase.complainant?.age !== '' ? rawCase.complainant.age : (rawCase.victim_details?.age || victimsInput[0]?.age)),
+        gender: rawCase.complainant?.gender || rawCase.victim_details?.gender || victimsInput[0]?.gender || null,
+        address: rawCase.complainant?.address || null,
+        contact_phone: rawCase.complainant?.contactPhone || null,
+        contact_email: rawCase.complainant?.contactEmail || null,
+        id_type: rawCase.complainant?.idType || null,
+        id_number: rawCase.complainant?.idNumber || null,
+        relationship_to_victim: rawCase.complainant?.relationshipToVictim || null
       },
       accused_suspects: resolvedSuspects,
       victims: victimsInput.map((vic: any) => ({

@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { useApp } from '@/context/AppContext';
 import { MOCK_DISTRICTS, Incident, Offender } from '@/lib/data';
 import GlassPanel from '../ui/GlassPanel';
-import { FilePlus, ShieldAlert, CheckCircle, RefreshCw, AlertTriangle } from 'lucide-react';
+import { FilePlus, ShieldAlert, CheckCircle, RefreshCw, AlertTriangle, Plus, Minus, X, Calendar } from 'lucide-react';
 import DateTimePicker from '../ui/DateTimePicker';
 
 const DISTRICT_STATIONS: Record<string, { name: string; code: string }[]> = {
@@ -296,9 +296,169 @@ export default function ReportIncident() {
     { name: '', age: '', gender: '', relation: '' }
   ]);
 
-  const [suspects, setSuspects] = useState([
+  const [suspects, setSuspects] = useState<Array<{ name: string; address: string; age: string; gender: string }>>([
     { name: '', address: '', age: '', gender: '' }
   ]);
+
+  const [complainantSameAsVictim, setComplainantSameAsVictim] = useState(true);
+  const [complainant, setComplainant] = useState({
+    name: '',
+    age: '',
+    gender: '',
+    relationToVictim: 'Self',
+    address: '',
+    contactPhone: '+91 ',
+    contactEmail: '',
+    idType: '',
+    idNumber: ''
+  });
+
+  const [currentStep, setCurrentStep] = useState(1);
+
+  const FORM_STEPS = [
+    { id: 1, key: 'district', label: 'District', title: 'Jurisdiction & Time' },
+    { id: 2, key: 'details', label: 'Details & Statements', title: 'Complainant & Victims' },
+    { id: 3, key: 'crime', label: 'Crime Details', title: 'Accused & Classification' },
+    { id: 4, key: 'investigation', label: 'Investigation', title: 'Investigation Details' }
+  ];
+
+  const validateStep = (stepNum: number): boolean => {
+    setErrorMsg(null);
+    if (stepNum === 1) {
+      if (!districtId) {
+        setErrorMsg('Please select a district/sector zone.');
+        return false;
+      }
+      if (!policeStation) {
+        setErrorMsg('Please select a police station.');
+        return false;
+      }
+      if (!location.trim()) {
+        setErrorMsg('Please enter an incident scene specific address.');
+        return false;
+      }
+      if (!dateTime) {
+        setErrorMsg('Please select the date and time of occurrence.');
+        return false;
+      }
+      if (!sectionsStr.trim()) {
+        setErrorMsg('Please enter the IPC / BNS sections.');
+        return false;
+      }
+    } else if (stepNum === 2) {
+      if (!complainantSameAsVictim) {
+        if (!complainant.name.trim()) {
+          setErrorMsg('Please enter the complainant name.');
+          return false;
+        }
+        if (!complainant.age.trim()) {
+          setErrorMsg('Please enter the complainant age.');
+          return false;
+        }
+        if (!complainant.gender) {
+          setErrorMsg('Please select the complainant gender.');
+          return false;
+        }
+        if (!complainant.relationToVictim.trim()) {
+          setErrorMsg('Please specify the relationship of the complainant to the victim.');
+          return false;
+        }
+      }
+      
+      // Validate victims list
+      for (let i = 0; i < victims.length; i++) {
+        if (!victims[i].name.trim()) {
+          setErrorMsg(`Please enter a name for Victim #${i + 1}.`);
+          return false;
+        }
+        if (!victims[i].age.trim()) {
+          setErrorMsg(`Please enter an age for Victim #${i + 1}.`);
+          return false;
+        }
+        if (!victims[i].gender) {
+          setErrorMsg(`Please select a gender for Victim #${i + 1}.`);
+          return false;
+        }
+        if (!victims[i].relation.trim()) {
+          setErrorMsg(`Please specify the relationship to suspect for Victim #${i + 1}.`);
+          return false;
+        }
+      }
+    } else if (stepNum === 3) {
+      // Validate suspects list
+      for (let i = 0; i < suspects.length; i++) {
+        if (!suspects[i].name.trim()) {
+          setErrorMsg(`Please enter a name for Suspect #${i + 1}.`);
+          return false;
+        }
+        if (!suspects[i].address.trim()) {
+          setErrorMsg(`Please enter an address for Suspect #${i + 1}.`);
+          return false;
+        }
+      }
+      if (!crimeType) {
+        setErrorMsg('Please select a crime category.');
+        return false;
+      }
+      if (!crimeSubcategory.trim()) {
+        setErrorMsg('Please enter a subcategory / MOD.');
+        return false;
+      }
+      if (!weaponUsed.trim()) {
+        setErrorMsg('Please specify the weapon used.');
+        return false;
+      }
+      if (!vehicleNo.trim()) {
+        setErrorMsg('Please specify the vehicle number.');
+        return false;
+      }
+      if (!description.trim()) {
+        setErrorMsg('Please enter a brief case analysis summary description.');
+        return false;
+      }
+    } else if (stepNum === 4) {
+      if (!officerId.trim()) {
+        setErrorMsg('Please enter the Investigating Officer ID.');
+        return false;
+      }
+      if (!convictionStatus) {
+        setErrorMsg('Please select the Conviction Status.');
+        return false;
+      }
+      if (!legalStage) {
+        setErrorMsg('Please select the Legal Stage.');
+        return false;
+      }
+      if (!officerName.trim()) {
+        setErrorMsg('Please enter the Investigating Officer Name.');
+        return false;
+      }
+      if (!officerRank) {
+        setErrorMsg('Please select the Investigating Officer Rank.');
+        return false;
+      }
+      if (!evidenceSummary.trim()) {
+        setErrorMsg('Please enter the Evidence Summary & Findings.');
+        return false;
+      }
+    }
+    return true;
+  };
+
+  const handleNext = (targetStep?: number) => {
+    if (validateStep(currentStep)) {
+      if (targetStep !== undefined) {
+        setCurrentStep(targetStep);
+      } else {
+        setCurrentStep(prev => Math.min(prev + 1, 4));
+      }
+    }
+  };
+
+  const handlePrevious = () => {
+    setErrorMsg(null);
+    setCurrentStep(prev => Math.max(prev - 1, 1));
+  };
 
   const addVictim = () => {
     setVictims(prev => [...prev, { name: '', age: '', gender: '', relation: '' }]);
@@ -340,6 +500,19 @@ export default function ReportIncident() {
     setSectionsStr('');
     setDateTime('');
     setLocation('');
+    setComplainantSameAsVictim(true);
+    setComplainant({
+      name: '',
+      age: '',
+      gender: '',
+      relationToVictim: 'Self',
+      address: '',
+      contactPhone: '+91 ',
+      contactEmail: '',
+      idType: '',
+      idNumber: ''
+    });
+    setCurrentStep(1);
     setVictims([{ name: '', age: '', gender: '', relation: '' }]);
     setSuspects([{ name: '', address: '', age: '', gender: '' }]);
     setCrimeType('');
@@ -374,6 +547,12 @@ export default function ReportIncident() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    for (let i = 1; i <= 4; i++) {
+      if (!validateStep(i)) {
+        setCurrentStep(i);
+        return;
+      }
+    }
     setLoading(true);
     setErrorMsg(null);
     setSuccessId(null);
@@ -429,6 +608,27 @@ export default function ReportIncident() {
           ipc_bns_sections: sections,
           date_time: new Date(dateTime).toISOString(),
           location: `${location}, ${districtName}`
+        },
+        complainant: complainantSameAsVictim ? {
+          name: victims[0]?.name || 'Unknown',
+          age: parseAgeInput(victims[0]?.age),
+          gender: victims[0]?.gender || null,
+          relationshipToVictim: 'Self',
+          address: '',
+          contactPhone: '',
+          contactEmail: '',
+          idType: '',
+          idNumber: ''
+        } : {
+          name: complainant.name || 'Unknown',
+          age: parseAgeInput(complainant.age),
+          gender: complainant.gender || null,
+          relationshipToVictim: complainant.relationToVictim || 'Stranger',
+          address: complainant.address || '',
+          contactPhone: complainant.contactPhone || '',
+          contactEmail: complainant.contactEmail || '',
+          idType: complainant.idType || '',
+          idNumber: complainant.idNumber || ''
         },
         // Maintain single properties for backward compatibility
         suspect_details: {
@@ -600,10 +800,35 @@ export default function ReportIncident() {
               color: 'var(--color-red)',
               display: 'flex',
               alignItems: 'center',
-              gap: '0.75rem'
+              justifyContent: 'space-between',
+              gap: '0.75rem',
+              animation: 'slideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards'
             }}>
-              <AlertTriangle size={18} />
-              <span>{errorMsg}</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <AlertTriangle size={18} />
+                <span>{errorMsg}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setErrorMsg(null)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: 'var(--color-red)',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  padding: '0.2rem',
+                  borderRadius: '50%',
+                  transition: 'background 0.2s',
+                  outline: 'none'
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)'}
+                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                title="Dismiss Alert"
+              >
+                <X size={16} />
+              </button>
             </div>
           )}
 
@@ -631,17 +856,197 @@ export default function ReportIncident() {
             </div>
           )}
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
+          <style>{`
+            @keyframes slideIn {
+              from { opacity: 0; transform: translateY(10px); }
+              to { opacity: 1; transform: translateY(0); }
+            }
+            .form-workspace-layout {
+              display: grid;
+              grid-template-columns: 280px 1fr;
+              gap: 2rem;
+              max-width: 1000px;
+              width: 100%;
+              margin: 0 auto;
+              align-items: start;
+            }
+            .vertical-stepper-sidebar {
+              background: var(--bg-secondary);
+              border-radius: 12px;
+              border: 1px solid var(--panel-border);
+              padding: 1.5rem;
+              box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+              display: flex;
+              flex-direction: column;
+              gap: 1.5rem;
+              position: sticky;
+              top: 2rem;
+            }
+            .active-step-workspace {
+              display: flex;
+              flex-direction: column;
+              gap: 1.5rem;
+              min-width: 0;
+            }
+            .step-container {
+              animation: slideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+              width: 100%;
+              max-width: 600px;
+              margin: 0 auto;
+              display: flex;
+              flex-direction: column;
+              gap: 1.25rem;
+            }
+            .form-nav-btn {
+              padding: 0.55rem 1.25rem;
+              font-size: 0.85rem;
+              font-weight: 600;
+              border-radius: 6px;
+              cursor: pointer;
+              transition: all 0.2s ease;
+            }
+            @media (max-width: 800px) {
+              .form-workspace-layout {
+                grid-template-columns: 1fr;
+                gap: 1.5rem;
+              }
+              .vertical-stepper-sidebar {
+                position: static;
+                padding: 1.25rem;
+              }
+            }
+          `}</style>
 
-            {/* COLUMN 1: JURISDICTION & LEGAL INFO */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          <div className="form-workspace-layout">
+            {/* Left Column: Vertical Stepper Sidebar */}
+            <div className="vertical-stepper-sidebar">
+              {/* Step header */}
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                fontSize: '0.85rem',
+                color: 'var(--text-muted)',
+                borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
+                paddingBottom: '0.75rem',
+                marginBottom: '0.25rem'
+              }}>
+                <span style={{
+                  display: 'inline-block',
+                  width: '8px',
+                  height: '8px',
+                  borderRadius: '50%',
+                  background: 'var(--color-success)',
+                  boxShadow: '0 0 8px var(--color-success)'
+                }} />
+                <span style={{ fontWeight: 600 }}>Step {currentStep} of 4</span>
+              </div>
 
+              {/* Stepper items container */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem', position: 'relative' }}>
+                {FORM_STEPS.map((step, idx) => {
+                  const isActive = step.id === currentStep;
+                  const isPassed = step.id < currentStep;
+
+                  return (
+                    <div
+                      key={step.id}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '1rem',
+                        position: 'relative',
+                        cursor: 'pointer'
+                      }}
+                      onClick={() => {
+                        if (step.id < currentStep) {
+                          setCurrentStep(step.id);
+                        } else if (step.id > currentStep) {
+                          handleNext(step.id);
+                        }
+                      }}
+                    >
+                      {/* Node container */}
+                      <div style={{
+                        position: 'relative',
+                        zIndex: 10,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        width: '24px'
+                      }}>
+                        {/* Circle Node */}
+                        <div style={{
+                          width: '24px',
+                          height: '24px',
+                          borderRadius: '50%',
+                          border: '2px solid',
+                          borderColor: isActive ? 'var(--color-blue)' : isPassed ? 'var(--color-success)' : 'var(--text-dark)',
+                          background: isActive ? 'var(--bg-primary)' : isPassed ? 'var(--color-success)' : 'var(--bg-secondary)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: isActive ? 'var(--color-blue)' : isPassed ? 'white' : 'var(--text-dark)',
+                          fontWeight: 'bold',
+                          fontSize: '0.75rem',
+                          boxShadow: isActive ? '0 0 12px var(--color-blue-glow)' : 'none',
+                          transition: 'all 0.3s ease'
+                        }}>
+                          {isPassed ? '✓' : step.id}
+                        </div>
+
+                        {/* Connector line to next circle */}
+                        {idx < FORM_STEPS.length - 1 && (
+                          <div style={{
+                            position: 'absolute',
+                            top: '24px',
+                            left: '11px',
+                            width: '2px',
+                            height: '34px',
+                            background: isPassed ? 'var(--color-success)' : 'var(--text-dark)',
+                            boxShadow: isPassed ? '0 0 4px var(--color-success-glow)' : 'none',
+                            transition: 'all 0.3s ease',
+                            zIndex: 1
+                          }} />
+                        )}
+                      </div>
+
+                      {/* Labels */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
+                        <span style={{
+                          fontSize: '0.8rem',
+                          fontWeight: isActive ? 600 : 500,
+                          color: isActive ? 'var(--text-primary)' : 'var(--text-muted)',
+                          transition: 'all 0.2s ease'
+                        }}>
+                          {step.label}
+                        </span>
+                        <span style={{
+                          fontSize: '0.65rem',
+                          color: 'var(--text-dark)',
+                          transition: 'all 0.2s ease'
+                        }}>
+                          {step.title}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Right Column: Active Step Workspace */}
+            <div className="active-step-workspace">
+
+          {/* STEP 1: JURISDICTION & TIME */}
+          {currentStep === 1 && (
+            <div className="step-container">
               {/* SECTION 1: JURISDICTION */}
               <GlassPanel style={{ padding: '1.5rem' }}>
                 <h3 style={{ fontSize: '0.9rem', fontWeight: 'bold', color: 'var(--color-success)', marginBottom: '1rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                   1. Jurisdiction & PS Details
                 </h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
                     <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>District / Sector Zone</label>
                     <select
@@ -710,11 +1115,10 @@ export default function ReportIncident() {
                           border: '1px solid rgba(255,255,255,0.05)',
                           borderRadius: '6px',
                           padding: '0.55rem',
-                          color: 'var(--text-muted)',
+                          color: 'var(--text-dark)',
                           fontSize: '0.85rem',
                           outline: 'none',
-                          cursor: 'not-allowed',
-                          width: '100%'
+                          fontFamily: 'var(--font-family-mono)'
                         }}
                       />
                     </div>
@@ -742,12 +1146,12 @@ export default function ReportIncident() {
                 </div>
               </GlassPanel>
 
-              {/* SECTION 2: LEGAL CODES */}
+              {/* SECTION 2: LEGAL DETAILS */}
               <GlassPanel style={{ padding: '1.5rem' }}>
                 <h3 style={{ fontSize: '0.9rem', fontWeight: 'bold', color: 'var(--color-success)', marginBottom: '1rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                   2. Legal Details
                 </h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
                     <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Date & Time of Occurrence</label>
                     <DateTimePicker
@@ -778,22 +1182,236 @@ export default function ReportIncident() {
                   </div>
                 </div>
               </GlassPanel>
+            </div>
+          )}
 
-              {/* SECTION 3: COMPLAINANT / VICTIMS */}
+          {/* STEP 2: COMPLAINANT & VICTIMS */}
+          {currentStep === 2 && (
+            <div className="step-container">
+              {/* SECTION 3: COMPLAINANT & VICTIMS */}
               <GlassPanel style={{ padding: '1.5rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                   <h3 style={{ fontSize: '0.9rem', fontWeight: 'bold', color: 'var(--color-success)', margin: 0, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                    3. Complainant / Victim details
+                    3. Complainant & Victim details
                   </h3>
-                  <button
-                    type="button"
-                    className="btn btn-secondary"
-                    onClick={addVictim}
-                    style={{ padding: '0.2rem 0.6rem', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.2rem', cursor: 'pointer' }}
-                  >
-                    <span>+</span> Add Victim
-                  </button>
                 </div>
+
+                {/* COMPLAINANT SUB-SECTION */}
+                <div style={{ marginBottom: '1.5rem', padding: '1rem', borderRadius: '6px', border: '1px solid rgba(59, 130, 246, 0.15)', background: 'rgba(59, 130, 246, 0.03)', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <input
+                      type="checkbox"
+                      id="complainantSameAsVictim"
+                      checked={complainantSameAsVictim}
+                      onChange={(e) => setComplainantSameAsVictim(e.target.checked)}
+                      style={{ cursor: 'pointer', width: '16px', height: '16px' }}
+                    />
+                    <label htmlFor="complainantSameAsVictim" style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'var(--color-blue)', cursor: 'pointer' }}>
+                      Complainant is same as Victim #1
+                    </label>
+                  </div>
+
+                  {complainantSameAsVictim ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                        Complainant details are mirrored from Victim #1.
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem', fontSize: '0.8rem' }}>
+                        <div><strong>Name:</strong> {victims[0]?.name || 'Not Entered'}</div>
+                        <div><strong>Age / Gender:</strong> {victims[0]?.age || 'Not Entered'} / {victims[0]?.gender || 'Not Entered'}</div>
+                        <div><strong>Relationship to Victim:</strong> Self</div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                      <div style={{ fontSize: '0.75rem', fontWeight: 'bold', color: 'var(--text-muted)' }}>
+                        Complainant Details
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: '1rem' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                          <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Complainant Name</label>
+                          <input
+                            type="text"
+                            value={complainant.name}
+                            onChange={e => setComplainant(p => ({ ...p, name: e.target.value }))}
+                            required
+                            placeholder="Enter complainant name"
+                            style={{
+                              background: 'rgba(0,0,0,0.25)',
+                              border: '1px solid rgba(255,255,255,0.08)',
+                              borderRadius: '6px',
+                              padding: '0.55rem',
+                              color: 'var(--text-primary)',
+                              fontSize: '0.85rem',
+                              outline: 'none'
+                            }}
+                          />
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                          <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Age</label>
+                          <input
+                            type="text"
+                            value={complainant.age}
+                            onChange={e => setComplainant(p => ({ ...p, age: e.target.value }))}
+                            required
+                            placeholder="e.g. 35"
+                            style={{
+                              background: 'rgba(0,0,0,0.25)',
+                              border: '1px solid rgba(255,255,255,0.08)',
+                              borderRadius: '6px',
+                              padding: '0.55rem',
+                              color: 'var(--text-primary)',
+                              fontSize: '0.85rem',
+                              outline: 'none'
+                            }}
+                          />
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                          <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Gender</label>
+                          <select
+                            className="report-select"
+                            value={complainant.gender}
+                            onChange={e => setComplainant(p => ({ ...p, gender: e.target.value }))}
+                            required
+                            style={{
+                              background: 'rgba(0,0,0,0.25)',
+                              border: '1px solid rgba(255,255,255,0.08)',
+                              borderRadius: '6px',
+                              padding: '0.55rem',
+                              color: 'var(--text-primary)',
+                              fontSize: '0.85rem',
+                              outline: 'none',
+                              width: '100%'
+                            }}
+                          >
+                            <option value="">Select</option>
+                            <option value="Male">Male</option>
+                            <option value="Female">Female</option>
+                            <option value="Other">Other</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                          <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Relationship to Victim</label>
+                          <input
+                            type="text"
+                            value={complainant.relationToVictim}
+                            onChange={e => setComplainant(p => ({ ...p, relationToVictim: e.target.value }))}
+                            required
+                            placeholder="e.g. Parent, Sibling, Witness"
+                            style={{
+                              background: 'rgba(0,0,0,0.25)',
+                              border: '1px solid rgba(255,255,255,0.08)',
+                              borderRadius: '6px',
+                              padding: '0.55rem',
+                              color: 'var(--text-primary)',
+                              fontSize: '0.85rem',
+                              outline: 'none'
+                            }}
+                          />
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                          <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Contact Phone</label>
+                          <input
+                            type="text"
+                            value={complainant.contactPhone}
+                            onChange={e => {
+                              let val = e.target.value;
+                              if (!val.startsWith('+91')) {
+                                val = '+91 ' + val.replace(/^\+?9?1?\s*/, '');
+                              }
+                              const prefix = '+91 ';
+                              const digits = val.slice(prefix.length).replace(/\D/g, '').slice(0, 10);
+                              setComplainant(p => ({ ...p, contactPhone: prefix + digits }));
+                            }}
+                            placeholder="e.g. 98765 43210"
+                            style={{
+                              background: 'rgba(0,0,0,0.25)',
+                              border: '1px solid rgba(255,255,255,0.08)',
+                              borderRadius: '6px',
+                              padding: '0.55rem',
+                              color: 'var(--text-primary)',
+                              fontSize: '0.85rem',
+                              outline: 'none'
+                            }}
+                          />
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                          <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>ID Type</label>
+                          <select
+                            className="report-select"
+                            value={complainant.idType}
+                            onChange={e => setComplainant(p => ({ ...p, idType: e.target.value }))}
+                            style={{
+                              background: 'rgba(0,0,0,0.25)',
+                              border: '1px solid rgba(255,255,255,0.08)',
+                              borderRadius: '6px',
+                              padding: '0.55rem',
+                              color: 'var(--text-primary)',
+                              fontSize: '0.85rem',
+                              outline: 'none'
+                            }}
+                          >
+                            <option value="">Select ID Type</option>
+                            <option value="Aadhaar Card">Aadhaar Card</option>
+                            <option value="PAN Card">PAN Card</option>
+                            <option value="Passport">Passport</option>
+                            <option value="Voter ID">Voter ID</option>
+                            <option value="Driving License">Driving License</option>
+                          </select>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                          <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>ID Number</label>
+                          <input
+                            type="text"
+                            value={complainant.idNumber}
+                            onChange={e => setComplainant(p => ({ ...p, idNumber: e.target.value }))}
+                            placeholder="Enter ID number"
+                            style={{
+                              background: 'rgba(0,0,0,0.25)',
+                              border: '1px solid rgba(255,255,255,0.08)',
+                              borderRadius: '6px',
+                              padding: '0.55rem',
+                              color: 'var(--text-primary)',
+                              fontSize: '0.85rem',
+                              outline: 'none'
+                            }}
+                          />
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                        <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Complainant Address</label>
+                        <input
+                          type="text"
+                          value={complainant.address}
+                          onChange={e => setComplainant(p => ({ ...p, address: e.target.value }))}
+                          placeholder="Full address of the complainant"
+                          style={{
+                            background: 'rgba(0,0,0,0.25)',
+                            border: '1px solid rgba(255,255,255,0.08)',
+                            borderRadius: '6px',
+                            padding: '0.55rem',
+                            color: 'var(--text-primary)',
+                            fontSize: '0.85rem',
+                            outline: 'none'
+                          }}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', margin: '1rem 0' }}></div>
+                <div style={{ fontSize: '0.75rem', fontWeight: 'bold', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>
+                  Victim Details
+                </div>
+
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
                   {victims.map((victim, index) => (
                     <div key={index} style={{
@@ -812,18 +1430,33 @@ export default function ReportIncident() {
                           onClick={() => removeVictim(index)}
                           style={{
                             position: 'absolute',
-                            top: '0.5rem',
-                            right: '0.5rem',
-                            border: 'none',
-                            background: 'rgba(239, 68, 68, 0.1)',
+                            top: '0.75rem',
+                            right: '0.75rem',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            width: '28px',
+                            height: '28px',
+                            borderRadius: '50%',
+                            border: '1px solid rgba(239, 68, 68, 0.3)',
+                            background: 'rgba(239, 68, 68, 0.08)',
                             color: 'var(--color-red)',
-                            borderRadius: '4px',
-                            padding: '0.2rem 0.5rem',
-                            fontSize: '0.7rem',
-                            cursor: 'pointer'
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease',
                           }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.background = 'rgba(239, 68, 68, 0.2)';
+                            e.currentTarget.style.borderColor = 'var(--color-red)';
+                            e.currentTarget.style.transform = 'scale(1.05)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.background = 'rgba(239, 68, 68, 0.08)';
+                            e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.3)';
+                            e.currentTarget.style.transform = 'scale(1)';
+                          }}
+                          title="Remove Victim"
                         >
-                          Remove
+                          <Minus size={14} />
                         </button>
                       )}
                       <div style={{ fontSize: '0.75rem', fontWeight: 'bold', color: 'var(--text-muted)' }}>
@@ -920,28 +1553,56 @@ export default function ReportIncident() {
                       </div>
                     </div>
                   ))}
+
+                  <div style={{ display: 'flex', justifyContent: 'center', marginTop: '0.5rem' }}>
+                    <button
+                      type="button"
+                      onClick={addVictim}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        width: '36px',
+                        height: '36px',
+                        borderRadius: '50%',
+                        border: '1px solid rgba(255, 255, 255, 0.15)',
+                        background: 'rgba(255, 255, 255, 0.05)',
+                        color: 'var(--text-primary)',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                        e.currentTarget.style.borderColor = 'var(--color-success)';
+                        e.currentTarget.style.color = 'var(--color-success)';
+                        e.currentTarget.style.transform = 'scale(1.05)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                        e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+                        e.currentTarget.style.color = 'var(--text-primary)';
+                        e.currentTarget.style.transform = 'scale(1)';
+                      }}
+                      title="Add Victim"
+                    >
+                      <Plus size={18} />
+                    </button>
+                  </div>
                 </div>
               </GlassPanel>
-
             </div>
+          )}
 
-            {/* COLUMN 2: CRIME CLASSIFICATION & SUSPECT DETAILS */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-
+          {/* STEP 3: ACCUSED & CRIME DETAILS */}
+          {currentStep === 3 && (
+            <div className="step-container">
               {/* SECTION 4: SUSPECT DETAILS */}
               <GlassPanel style={{ padding: '1.5rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                   <h3 style={{ fontSize: '0.9rem', fontWeight: 'bold', color: 'var(--color-success)', margin: 0, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                     4. Accused / Suspect Details
                   </h3>
-                  <button
-                    type="button"
-                    className="btn btn-secondary"
-                    onClick={addSuspect}
-                    style={{ padding: '0.2rem 0.6rem', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.2rem', cursor: 'pointer' }}
-                  >
-                    <span>+</span> Add Suspect
-                  </button>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
                   {suspects.map((suspect, index) => (
@@ -961,18 +1622,33 @@ export default function ReportIncident() {
                           onClick={() => removeSuspect(index)}
                           style={{
                             position: 'absolute',
-                            top: '0.5rem',
-                            right: '0.5rem',
-                            border: 'none',
-                            background: 'rgba(239, 68, 68, 0.1)',
+                            top: '0.75rem',
+                            right: '0.75rem',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            width: '28px',
+                            height: '28px',
+                            borderRadius: '50%',
+                            border: '1px solid rgba(239, 68, 68, 0.3)',
+                            background: 'rgba(239, 68, 68, 0.08)',
                             color: 'var(--color-red)',
-                            borderRadius: '4px',
-                            padding: '0.2rem 0.5rem',
-                            fontSize: '0.7rem',
-                            cursor: 'pointer'
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease',
                           }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.background = 'rgba(239, 68, 68, 0.2)';
+                            e.currentTarget.style.borderColor = 'var(--color-red)';
+                            e.currentTarget.style.transform = 'scale(1.05)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.background = 'rgba(239, 68, 68, 0.08)';
+                            e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.3)';
+                            e.currentTarget.style.transform = 'scale(1)';
+                          }}
+                          title="Remove Suspect"
                         >
-                          Remove
+                          <Minus size={14} />
                         </button>
                       )}
                       <div style={{ fontSize: '0.75rem', fontWeight: 'bold', color: 'var(--text-muted)' }}>
@@ -1067,10 +1743,46 @@ export default function ReportIncident() {
                       </div>
                     </div>
                   ))}
+
+                  <div style={{ display: 'flex', justifyContent: 'center', marginTop: '0.5rem' }}>
+                    <button
+                      type="button"
+                      onClick={addSuspect}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        width: '36px',
+                        height: '36px',
+                        borderRadius: '50%',
+                        border: '1px solid rgba(255, 255, 255, 0.15)',
+                        background: 'rgba(255, 255, 255, 0.05)',
+                        color: 'var(--text-primary)',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                        e.currentTarget.style.borderColor = 'var(--color-success)';
+                        e.currentTarget.style.color = 'var(--color-success)';
+                        e.currentTarget.style.transform = 'scale(1.05)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                        e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+                        e.currentTarget.style.color = 'var(--text-primary)';
+                        e.currentTarget.style.transform = 'scale(1)';
+                      }}
+                      title="Add Suspect"
+                    >
+                      <Plus size={18} />
+                    </button>
+                  </div>
                 </div>
               </GlassPanel>
 
-              {/* SECTION 5: INCIDENT DETAILS */}
+              {/* SECTION 5: INCIDENT CLASSIFICATION */}
               <GlassPanel style={{ padding: '1.5rem' }}>
                 <h3 style={{ fontSize: '0.9rem', fontWeight: 'bold', color: 'var(--color-success)', marginBottom: '1rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                   5. Incident Classification
@@ -1184,7 +1896,12 @@ export default function ReportIncident() {
                   </div>
                 </div>
               </GlassPanel>
+            </div>
+          )}
 
+          {/* STEP 4: INVESTIGATION DETAILS */}
+          {currentStep === 4 && (
+            <div className="step-container">
               {/* SECTION 6: INVESTIGATION DETAILS */}
               <GlassPanel style={{ padding: '1.5rem' }}>
                 <h3 style={{ fontSize: '0.9rem', fontWeight: 'bold', color: 'var(--color-success)', marginBottom: '1rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
@@ -1385,32 +2102,81 @@ export default function ReportIncident() {
                   </div>
                 </div>
               </GlassPanel>
+            </div>
+          )}
 
+          {/* NAVIGATION FOOTER */}
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginTop: '1.5rem',
+            maxWidth: '600px',
+            width: '100%',
+            margin: '1.5rem auto 0 auto'
+          }}>
+            <div>
+              {currentStep > 1 && (
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={handlePrevious}
+                  style={{
+                    padding: '0.75rem 2rem',
+                    fontSize: '0.9rem',
+                    fontWeight: 'bold',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Previous
+                </button>
+              )}
+            </div>
+
+            <div>
+              {currentStep < 4 ? (
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() => handleNext()}
+                  style={{
+                    padding: '0.75rem 2rem',
+                    fontSize: '0.9rem',
+                    fontWeight: 'bold',
+                    cursor: 'pointer',
+                    backgroundColor: 'var(--color-success)',
+                    borderColor: 'var(--color-success)',
+                    color: '#fff'
+                  }}
+                >
+                  Next Step
+                </button>
+              ) : (
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  style={{
+                    padding: '0.75rem 2rem',
+                    fontSize: '0.9rem',
+                    fontWeight: 'bold',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    backgroundColor: 'var(--color-success)',
+                    borderColor: 'var(--color-success)',
+                    color: '#fff',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <FilePlus size={16} />
+                  Submit Incident Report
+                </button>
+              )}
             </div>
           </div>
-
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
-            <button
-              type="submit"
-              className="btn btn-primary"
-              style={{
-                padding: '0.75rem 2rem',
-                fontSize: '0.9rem',
-                fontWeight: 'bold',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                backgroundColor: 'var(--color-success)',
-                borderColor: 'var(--color-success)',
-                color: '#fff',
-                cursor: 'pointer'
-              }}
-            >
-              <FilePlus size={16} />
-              Submit Incident Report
-            </button>
-          </div>
-        </form>
+        </div>
+      </div>
+    </form>
       )}
     </div>
   );

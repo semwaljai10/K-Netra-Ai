@@ -208,6 +208,11 @@ export default function IncidentModal() {
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--panel-border)', background: 'rgba(255, 255, 255, 0.01)' }}>
                     <div><strong>Name:</strong> {complainant.name}</div>
                     <div><strong>Age / Gender:</strong> {complainant.age || 'N/A'} / {complainant.gender || 'N/A'}</div>
+                    {(complainant.relationshipToVictim || complainant.relationship_to_victim) && (
+                      <div style={{ gridColumn: 'span 2' }}>
+                        <strong>Relationship to Victim:</strong> {complainant.relationshipToVictim || complainant.relationship_to_victim}
+                      </div>
+                    )}
                     {complainant.contactPhone && <div><strong>Phone:</strong> {complainant.contactPhone}</div>}
                     {complainant.contactEmail && <div><strong>Email:</strong> {complainant.contactEmail}</div>}
                     {complainant.idType && <div style={{ gridColumn: 'span 2' }}><strong>Identification:</strong> {complainant.idType} - {complainant.idNumber}</div>}
