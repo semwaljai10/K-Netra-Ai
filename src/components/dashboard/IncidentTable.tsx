@@ -200,8 +200,8 @@ export default function IncidentTable() {
       </div>
       {totalItems > 0 && (
         <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
+          display: 'grid',
+          gridTemplateColumns: '1fr auto 1fr',
           alignItems: 'center',
           padding: '1rem 1.5rem',
           borderTop: '1px solid var(--panel-border)',
@@ -209,25 +209,89 @@ export default function IncidentTable() {
           borderBottomLeftRadius: '12px',
           borderBottomRightRadius: '12px'
         }}>
-          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-            Showing <strong style={{ color: 'var(--text-primary)' }}>{totalItems === 0 ? 0 : startIndex + 1}</strong>–<strong style={{ color: 'var(--text-primary)' }}>{endIndex}</strong> of <strong style={{ color: 'var(--text-primary)' }}>{totalItems}</strong> cases
-          </span>
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <div 
+            className={`pagination-btn-container ${currentPage === 1 ? 'disabled' : ''}`}
+            onClick={() => {
+              if (currentPage > 1) setCurrentPage(prev => Math.max(prev - 1, 1));
+            }}
+            style={{ justifyContent: 'flex-start' }}
+          >
             <button
-              className="btn btn-secondary"
-              style={{ padding: '0.4rem 0.8rem', fontSize: '0.75rem' }}
-              onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+              className="pagination-btn"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (currentPage > 1) setCurrentPage(prev => Math.max(prev - 1, 1));
+              }}
               disabled={currentPage === 1}
+              aria-label="Previous page"
             >
-              Previous
+              &lt;
             </button>
-            <button
-              className="btn btn-secondary"
-              style={{ padding: '0.4rem 0.8rem', fontSize: '0.75rem' }}
-              onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-              disabled={currentPage === totalPages || totalPages === 0}
-            >
+            <span className={`pagination-btn-label ${currentPage === 1 ? 'disabled' : ''}`}>
+              Previous
+            </span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', justifyContent: 'center' }}>
+            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', textAlign: 'center' }}>
+              Showing <strong style={{ color: 'var(--text-primary)' }}>{totalItems === 0 ? 0 : startIndex + 1}</strong>–<strong style={{ color: 'var(--text-primary)' }}>{endIndex}</strong> of <strong style={{ color: 'var(--text-primary)' }}>{totalItems}</strong> cases
+            </span>
+            {totalPages > 1 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                <span style={{ fontSize: '0.7rem', color: 'var(--text-dark)' }}>Go to:</span>
+                <select
+                  className="filter-select"
+                  style={{
+                    height: '26px',
+                    padding: '0 1.25rem 0 0.4rem',
+                    fontSize: '0.75rem',
+                    background: 'rgba(255, 255, 255, 0.02)',
+                    borderColor: 'var(--panel-border)',
+                    borderRadius: '4px',
+                    color: 'var(--text-muted)',
+                    outline: 'none',
+                    cursor: 'pointer'
+                  }}
+                  value={currentPage}
+                  onChange={(e) => setCurrentPage(Number(e.target.value))}
+                >
+                  {Array.from({ length: totalPages }, (_, idx) => {
+                    const pageNum = idx + 1;
+                    const start = idx * itemsPerPage + 1;
+                    const end = Math.min(pageNum * itemsPerPage, totalItems);
+                    return (
+                      <option 
+                        key={pageNum} 
+                        value={pageNum} 
+                        style={{ background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
+                      >
+                        {start}–{end}
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+            )}
+          </div>
+          <div 
+            className={`pagination-btn-container ${(currentPage === totalPages || totalPages === 0) ? 'disabled' : ''}`}
+            onClick={() => {
+              if (currentPage < totalPages && totalPages > 0) setCurrentPage(prev => Math.min(prev + 1, totalPages));
+            }}
+            style={{ justifyContent: 'flex-end' }}
+          >
+            <span className={`pagination-btn-label ${(currentPage === totalPages || totalPages === 0) ? 'disabled' : ''}`}>
               Next
+            </span>
+            <button
+              className="pagination-btn"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (currentPage < totalPages && totalPages > 0) setCurrentPage(prev => Math.min(prev + 1, totalPages));
+              }}
+              disabled={currentPage === totalPages || totalPages === 0}
+              aria-label="Next page"
+            >
+              &gt;
             </button>
           </div>
         </div>

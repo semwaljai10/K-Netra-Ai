@@ -9,6 +9,7 @@ import {
 } from '@/lib/data';
 import { ALL_SIGNAL_TYPES } from '@/lib/syndicateAnalysis';
 import { supabase } from '@/lib/supabase';
+import { anomalyDetector } from '@/lib/crimeMLEngine';
 
 export type ActiveView = 'dashboard' | 'map' | 'network' | 'offenders' | 'socio' | 'predictor' | 'admin' | 'profile' | 'report';
 export type ThemeMode = 'system' | 'light' | 'dark';
@@ -819,7 +820,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return () => clearInterval(checkInterval);
   }, [isAuthenticated]);
 
-  const anomalies = useMemo(() => MOCK_ANOMALIES, []);
+  // ML-powered anomaly detection: compute anomalies from real incident data
+  // Falls back to MOCK_ANOMALIES if no statistical anomalies are detected
+  const anomalies = useMemo(() => {
+    const detectedAnomalies = anomalyDetector.detect(incidents);
+    return detectedAnomalies.length > 0 ? detectedAnomalies : MOCK_ANOMALIES;
+  }, [incidents]);
 
   useEffect(() => {
     const loadDynamicData = async () => {

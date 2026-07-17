@@ -39,6 +39,15 @@ export default function AnomalyFeed() {
           AI Anomaly Detection Warnings
         </h2>
         <span style={{ fontSize: '0.65rem', color: 'var(--color-success)', fontFamily: 'var(--font-family-mono)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+          <span style={{ 
+            fontSize: '0.5rem', padding: '0.1rem 0.3rem',
+            background: 'rgba(59, 130, 246, 0.15)',
+            border: '1px solid rgba(59, 130, 246, 0.3)',
+            borderRadius: '3px', color: 'var(--color-blue)',
+            marginRight: '0.2rem', fontWeight: 600
+          }}>
+            ML-POWERED
+          </span>
           <span className="term-dot"></span> LIVE
         </span>
       </div>

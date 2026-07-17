@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useApp } from '@/context/AppContext';
 import { Line } from 'react-chartjs-2';
+import { trendForecaster } from '@/lib/crimeMLEngine';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -29,7 +30,7 @@ ChartJS.register(
 );
 
 export default function TrendChart() {
-  const { incidents, resolvedTheme } = useApp();
+  const { filteredIncidents, resolvedTheme } = useApp();
   const [mounted, setMounted] = useState(false);
   const [offsetDays, setOffsetDays] = useState(0);
   const [selectedYear, setSelectedYear] = useState<number>(() => new Date().getFullYear());
@@ -67,7 +68,7 @@ export default function TrendChart() {
     labels.push(labelStr);
 
     // Count incidents on this specific day
-    const countOnDay = incidents.filter(inc => inc.timestamp.startsWith(dateStr)).length;
+    const countOnDay = filteredIncidents.filter(inc => inc.timestamp.startsWith(dateStr)).length;
     activeCounts.push(countOnDay);
     
     // Create a mock baseline: steady average of 0.8 per day with slight random noise
@@ -80,12 +81,38 @@ export default function TrendChart() {
   startDate.setDate(now.getDate() - 9);
   const dateRangeStr = `${startDate.toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })} - ${now.toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}`;
 
+  // Generate 3-day AI forecast using exponential smoothing
+  const forecastDays = 3;
+  const forecastValues = trendForecaster.forecast(activeCounts, forecastDays);
+  
+  // Extend labels with forecast dates
+  const forecastLabels: string[] = [];
+  for (let i = 1; i <= forecastDays; i++) {
+    const d = new Date(now);
+    d.setDate(now.getDate() + i);
+    forecastLabels.push(d.toLocaleDateString('en-IN', { month: 'short', day: 'numeric' }));
+  }
+
+  const allLabels = [...labels, ...forecastLabels];
+
+  // Build forecast data array: null for historical, then forecast values
+  const forecastData: (number | null)[] = [
+    ...activeCounts.map(() => null as number | null),
+    ...forecastValues
+  ];
+  // Connect forecast to last real data point
+  forecastData[activeCounts.length - 1] = activeCounts[activeCounts.length - 1];
+
+  // Extend baseline to cover forecast period
+  const extendedBaseline = [...baselineCounts, ...Array(forecastDays).fill(null)];
+  const extendedActive = [...activeCounts, ...Array(forecastDays).fill(null)];
+
   const data = {
-    labels,
+    labels: allLabels,
     datasets: [
       {
         label: 'Active Tactical Incidents',
-        data: activeCounts,
+        data: extendedActive,
         borderColor: '#3b82f6',
         backgroundColor: 'rgba(59, 130, 246, 0.1)',
         borderWidth: 2,
@@ -93,10 +120,11 @@ export default function TrendChart() {
         fill: true,
         pointBackgroundColor: '#3b82f6',
         pointHoverRadius: 6,
+        spanGaps: false,
       },
       {
         label: 'AI Historical Baseline',
-        data: baselineCounts,
+        data: extendedBaseline,
         borderColor: '#a855f7',
         backgroundColor: 'transparent',
         borderWidth: 1.5,
@@ -104,6 +132,24 @@ export default function TrendChart() {
         tension: 0.3,
         fill: false,
         pointRadius: 0,
+        spanGaps: false,
+      },
+      {
+        label: 'AI Forecast (Exp. Smoothing)',
+        data: forecastData,
+        borderColor: '#10b981',
+        backgroundColor: 'rgba(16, 185, 129, 0.08)',
+        borderWidth: 2,
+        borderDash: [6, 4],
+        tension: 0.3,
+        fill: true,
+        pointBackgroundColor: '#10b981',
+        pointRadius: (ctx: any) => {
+          // Only show points for forecast values (not the connecting point)
+          return ctx.dataIndex > activeCounts.length - 1 ? 4 : 0;
+        },
+        pointHoverRadius: 6,
+        spanGaps: true,
       }
     ]
   };

@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useApp } from '@/context/AppContext';
 import GlassPanel from '../ui/GlassPanel';
-import { Play, RotateCcw, BrainCircuit, Terminal, Activity, AlertTriangle } from 'lucide-react';
+import { Play, RotateCcw, BrainCircuit, Activity, AlertTriangle, Info, TrendingUp, TrendingDown } from 'lucide-react';
 import { Bar } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -14,12 +14,22 @@ import {
   Legend,
   ChartOptions
 } from 'chart.js';
+import { crimePredictor, type PredictionResult, type ModelInfo, type TrainingLog } from '@/lib/crimeMLEngine';
+import { MOCK_SOCIO_ECONOMIC } from '@/lib/data';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip, Legend);
 
 export default function PredictionArea() {
   const { resolvedTheme } = useApp();
-  // Slider states (Defaulting to Dakshina Kannada baseline values)
+  
+  // District selector state
+  const [selectedDistrictId, setSelectedDistrictId] = useState<string>('KA_dakshina_kannada');
+
+  const selectedDistrict = useMemo(() => {
+    return MOCK_SOCIO_ECONOMIC.find(d => d.districtId === selectedDistrictId) || MOCK_SOCIO_ECONOMIC[0];
+  }, [selectedDistrictId]);
+
+  // Slider states (Defaulting to selected district baseline values)
   const [unemployment, setUnemployment] = useState<number>(11.7);
   const [lighting, setLighting] = useState<number>(62);
   const [patrol, setPatrol] = useState<number>(4);
@@ -29,6 +39,10 @@ export default function PredictionArea() {
   const [isSimulating, setIsSimulating] = useState<boolean>(false);
   const [terminalLogs, setTerminalLogs] = useState<string[]>([]);
   const [predictedRate, setPredictedRate] = useState<number>(46.0);
+  const [predictionResult, setPredictionResult] = useState<PredictionResult | null>(null);
+  const [modelInfo, setModelInfo] = useState<ModelInfo | null>(null);
+  const [isModelTrained, setIsModelTrained] = useState<boolean>(false);
+  const [showModelInfo, setShowModelInfo] = useState<boolean>(false);
   const terminalEndRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll terminal logs
@@ -36,57 +50,112 @@ export default function PredictionArea() {
     terminalEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [terminalLogs]);
 
+  // Check if model is already trained on mount
+  useEffect(() => {
+    if (crimePredictor.status === 'ready') {
+      setIsModelTrained(true);
+      setModelInfo(crimePredictor.getModelInfo());
+    }
+  }, []);
+
+  const appendLog = useCallback((text: string) => {
+    setTerminalLogs(prev => [...prev, text]);
+  }, []);
+
   // Handle run simulation triggers
-  const handleRunSimulation = () => {
+  const handleRunSimulation = async () => {
     setIsSimulating(true);
     setTerminalLogs([]);
 
-    const logSequence = [
-      { text: "[INITIALIZING] Accessing socio-economic weight vectors...", delay: 100 },
-      { text: "[TELEMETRY] Sector Dakshina Kannada (KA_dakshina_kannada) selected as baseline.", delay: 350 },
-      { text: "[REGRESSION] Coefficients: Unemployment=+2.1 | Lighting=-0.4 | Patrol=-3.2 | Income=-0.15", delay: 700 },
-      { text: `[COMPILING] Modeling variables: U=${unemployment}%, L=${lighting}%, P=${patrol}/10, I=₹${income}k...`, delay: 1050 },
-      { text: "[PROCESSING] Running multivariate regression matrix computation...", delay: 1400 }
-    ];
-
-    logSequence.forEach((log) => {
-      setTimeout(() => {
-        setTerminalLogs(prev => [...prev, log.text]);
-      }, log.delay);
-    });
-
-    // Final calculation log
-    setTimeout(() => {
-      // Regression Formula centered on Dakshina Kannada baseline
-      // Base crime rate = 46.0
-      const baseUnemployment = 11.7;
-      const baseLighting = 62;
-      const basePatrol = 4;
-      const baseIncome = 73;
-
-      const deltaU = (unemployment - baseUnemployment) * 2.1;
-      const deltaL = (lighting - baseLighting) * -0.4;
-      const deltaP = (patrol - basePatrol) * -3.2;
-      const deltaI = (income - baseIncome) * -0.15;
-
-      const rawCalculated = 46.0 + deltaU + deltaL + deltaP + deltaI;
-      const finalVal = parseFloat(Math.max(5.0, rawCalculated).toFixed(1));
+    if (!isModelTrained) {
+      // ── First run: Train the model ──
+      appendLog("[INITIALIZING] TensorFlow.js Neural Network Engine v2.0...");
       
-      setPredictedRate(finalVal);
+      await new Promise(r => setTimeout(r, 200));
+      const stats = await new Promise<ReturnType<typeof import('@/lib/crimeTrainingData').getDatasetStats> | null>((resolve) => {
+        import('@/lib/crimeTrainingData').then(({ generateTrainingDataset, getDatasetStats }) => {
+          const dataset = generateTrainingDataset();
+          resolve(getDatasetStats(dataset));
+        });
+      });
 
-      const statusMsg = `[COMPLETED] Neural model compiled. Estimated Crime Rate: ${finalVal}/100k. Stability index locked.`;
-      setTerminalLogs(prev => [...prev, statusMsg]);
-      setIsSimulating(false);
-    }, 1800);
+      if (stats) {
+        appendLog(`[DATASET] Loaded ${stats.totalSamples} training samples from ${stats.uniqueDistricts} Karnataka districts (${stats.yearsSpanned.join(', ')})`);
+        appendLog(`[DATASET] Crime rate range: ${stats.crimeRateRange.min} – ${stats.crimeRateRange.max}/100k | Mean: ${stats.crimeRateMean} | Std: ${stats.crimeRateStd}`);
+      }
+
+      await new Promise(r => setTimeout(r, 300));
+      appendLog("[ARCHITECTURE] Building: Input(4) → Dense(32,ReLU) → Dropout(0.15) → Dense(16,ReLU) → Dense(8,ReLU) → Dense(1)");
+      appendLog("[TRAINING] Starting model training with Adam optimizer (lr=0.005)...");
+
+      await new Promise(r => setTimeout(r, 200));
+
+      // Train with real epoch callbacks
+      let lastLoggedEpoch = 0;
+      await crimePredictor.train((log: TrainingLog) => {
+        // Log every 10 epochs + the last one
+        if (log.epoch % 10 === 0 || log.epoch === 1 || log.epoch === 60) {
+          lastLoggedEpoch = log.epoch;
+          const valStr = log.valLoss !== undefined ? ` | val_loss: ${log.valLoss.toFixed(4)}` : '';
+          appendLog(`[EPOCH ${String(log.epoch).padStart(2, ' ')}/60] loss: ${log.loss.toFixed(4)}${valStr}`);
+        }
+      });
+
+      setIsModelTrained(true);
+      const info = crimePredictor.getModelInfo();
+      setModelInfo(info);
+      appendLog(`[TRAINED] Model ready. ${info.totalParams} parameters | Final loss: ${info.finalLoss.toFixed(4)}`);
+      appendLog(`[BASELINE] District: ${selectedDistrict.districtName} (${selectedDistrict.districtId})`);
+      
+      await new Promise(r => setTimeout(r, 200));
+    } else {
+      // ── Subsequent runs: Use cached model ──
+      appendLog("[MODEL] TensorFlow.js Neural Network (cached) — ready for inference.");
+      appendLog(`[BASELINE] District: ${selectedDistrict.districtName} (${selectedDistrict.districtId})`);
+      appendLog(`[PARAMS] U=${unemployment}%, L=${lighting}%, P=${patrol}/10, I=₹${income}k`);
+      await new Promise(r => setTimeout(r, 400));
+    }
+
+    // ── Run prediction ──
+    appendLog(`[INFERENCE] Running prediction: U=${unemployment}%, L=${lighting}%, P=${patrol}/10, I=₹${income}k...`);
+    await new Promise(r => setTimeout(r, 300));
+
+    const result = crimePredictor.predict(unemployment, income, lighting, patrol);
+    setPredictedRate(result.predictedRate);
+    setPredictionResult(result);
+    setModelInfo(crimePredictor.getModelInfo());
+
+    appendLog(`[RESULT] Predicted Crime Rate: ${result.predictedRate}/100k (95% CI: ${result.confidence.low} – ${result.confidence.high})`);
+    appendLog(`[IMPORTANCE] Unemployment: ${(result.featureImportance.unemployment * 100).toFixed(1)}% | Income: ${(result.featureImportance.income * 100).toFixed(1)}% | Lighting: ${(result.featureImportance.lighting * 100).toFixed(1)}% | Patrol: ${(result.featureImportance.patrol * 100).toFixed(1)}%`);
+    appendLog(`[COMPLETED] Neural network inference complete. Confidence interval locked.`);
+
+    setIsSimulating(false);
+  };
+
+  const handleDistrictChange = (districtId: string) => {
+    setSelectedDistrictId(districtId);
+    const dist = MOCK_SOCIO_ECONOMIC.find(d => d.districtId === districtId);
+    if (dist) {
+      setUnemployment(dist.unemploymentRate);
+      setLighting(dist.streetLighting);
+      setPatrol(dist.policePatrol);
+      setIncome(dist.avgIncome);
+      setPredictedRate(dist.crimeRate);
+      setPredictionResult(null);
+      setTerminalLogs([`[SELECT] Loaded baseline values for ${dist.districtName}.`]);
+    }
   };
 
   const handleResetVariables = () => {
-    setUnemployment(11.7);
-    setLighting(62);
-    setPatrol(4);
-    setIncome(73);
-    setPredictedRate(46.0);
-    setTerminalLogs(["[RESET] Variables returned to Dakshina Kannada default baseline values."]);
+    if (selectedDistrict) {
+      setUnemployment(selectedDistrict.unemploymentRate);
+      setLighting(selectedDistrict.streetLighting);
+      setPatrol(selectedDistrict.policePatrol);
+      setIncome(selectedDistrict.avgIncome);
+      setPredictedRate(selectedDistrict.crimeRate);
+      setPredictionResult(null);
+      setTerminalLogs([`[RESET] Variables returned to ${selectedDistrict.districtName} default baseline values.`]);
+    }
   };
 
   // Determine threat level badge and color
@@ -101,18 +170,18 @@ export default function PredictionArea() {
 
   // Chart configuration for comparison
   const comparisonData = {
-    labels: ['Current Baseline Rate (Dakshina Kannada)', 'AI Simulated Forecast'],
+    labels: [`Current Baseline Rate (${selectedDistrict.districtName})`, 'AI Neural Network Forecast'],
     datasets: [
       {
         label: 'Crime Rate per 100k Population',
-        data: [46.0, predictedRate],
+        data: [selectedDistrict.crimeRate, predictedRate],
         backgroundColor: [
           'rgba(59, 130, 246, 0.25)', // Baseline (Blue)
-          predictedRate > 46.0 ? 'rgba(239, 68, 68, 0.25)' : 'rgba(16, 185, 129, 0.25)' // Simulated (Red/Green)
+          predictedRate > selectedDistrict.crimeRate ? 'rgba(239, 68, 68, 0.25)' : 'rgba(16, 185, 129, 0.25)' // Simulated (Red/Green)
         ],
         borderColor: [
           'var(--color-blue)',
-          predictedRate > 46.0 ? 'var(--color-red)' : 'var(--color-success)'
+          predictedRate > selectedDistrict.crimeRate ? 'var(--color-red)' : 'var(--color-success)'
         ],
         borderWidth: 2,
         borderRadius: 6
@@ -156,6 +225,35 @@ export default function PredictionArea() {
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.75rem', marginBottom: '0.5rem' }}>
           <BrainCircuit size={18} style={{ color: 'var(--color-blue)' }} />
           <h2 style={{ margin: 0, fontSize: '1rem', fontFamily: 'var(--font-family-title)' }}>Socio-Economic Weights</h2>
+        </div>
+
+        {/* District selector dropdown */}
+        <div style={{ marginBottom: '1.25rem' }}>
+          <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.3rem' }}>
+            Select District Baseline
+          </label>
+          <select
+            value={selectedDistrictId}
+            onChange={(e) => handleDistrictChange(e.target.value)}
+            style={{
+              width: '100%',
+              background: 'rgba(0,0,0,0.3)',
+              border: '1px solid rgba(255,255,255,0.08)',
+              color: 'var(--color-blue)',
+              fontWeight: 'bold',
+              padding: '0.4rem 0.6rem',
+              borderRadius: '6px',
+              outline: 'none',
+              cursor: 'pointer',
+              fontSize: '0.8rem',
+            }}
+          >
+            {MOCK_SOCIO_ECONOMIC.map((dist) => (
+              <option key={dist.districtId} value={dist.districtId} style={{ background: '#1e2022', color: '#fff' }}>
+                {dist.districtName}
+              </option>
+            ))}
+          </select>
         </div>
 
         {/* Sliders */}
@@ -232,7 +330,7 @@ export default function PredictionArea() {
             onClick={handleRunSimulation}
           >
             <Play size={14} />
-            {isSimulating ? 'Processing Matrix...' : 'Execute Simulator'}
+            {isSimulating ? 'Training Neural Net...' : isModelTrained ? 'Run Inference' : 'Train & Execute Model'}
           </button>
           <button 
             className="btn btn-secondary" 
@@ -243,6 +341,60 @@ export default function PredictionArea() {
             Reset to Baseline
           </button>
         </div>
+
+        {/* Model info toggle */}
+        {modelInfo && (
+          <button
+            onClick={() => setShowModelInfo(!showModelInfo)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '0.4rem',
+              marginTop: '0.75rem', padding: '0.4rem 0.6rem',
+              background: 'rgba(59, 130, 246, 0.1)',
+              border: '1px solid rgba(59, 130, 246, 0.2)',
+              borderRadius: '6px', cursor: 'pointer',
+              color: 'var(--color-blue)', fontSize: '0.7rem',
+              fontFamily: 'var(--font-family-mono)', width: '100%',
+              justifyContent: 'center',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            <Info size={12} />
+            {showModelInfo ? 'Hide Model Info' : 'View Model Architecture'}
+          </button>
+        )}
+
+        {/* Model info panel */}
+        {showModelInfo && modelInfo && (
+          <div style={{
+            marginTop: '0.5rem', padding: '0.6rem',
+            background: 'rgba(59, 130, 246, 0.05)',
+            border: '1px solid rgba(59, 130, 246, 0.15)',
+            borderRadius: '8px', fontSize: '0.65rem',
+            fontFamily: 'var(--font-family-mono)',
+            lineHeight: '1.6'
+          }}>
+            <div style={{ color: 'var(--color-blue)', fontWeight: 600, marginBottom: '0.3rem' }}>
+              TensorFlow.js Model
+            </div>
+            <div style={{ color: 'var(--text-secondary)' }}>
+              <div>Architecture: {modelInfo.architecture}</div>
+              <div>Parameters: {modelInfo.totalParams.toLocaleString()}</div>
+              <div>Training Samples: {modelInfo.trainingSamples.toLocaleString()}</div>
+              <div>Final Loss: {modelInfo.finalLoss.toFixed(6)}</div>
+              <div>Status: <span style={{ color: modelInfo.status === 'ready' ? 'var(--color-success)' : 'var(--color-yellow)' }}>
+                {modelInfo.status.toUpperCase()}
+              </span></div>
+              {modelInfo.datasetStats && (
+                <>
+                  <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', marginTop: '0.3rem', paddingTop: '0.3rem' }}>
+                    Districts: {modelInfo.datasetStats.uniqueDistricts}
+                  </div>
+                  <div>Years: {modelInfo.datasetStats.yearsSpanned.join(', ')}</div>
+                </>
+              )}
+            </div>
+          </div>
+        )}
       </GlassPanel>
 
       {/* 2. Simulation display and terminal logs */}
@@ -252,6 +404,19 @@ export default function PredictionArea() {
             <span>Forecasted Crime Density</span>
             <strong style={{ color: risk.color }}>{predictedRate}</strong>
             <span className="sim-out-unit">Incidents / 100k Pop</span>
+            {/* Confidence interval */}
+            {predictionResult && (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: '0.3rem',
+                marginTop: '0.25rem', fontSize: '0.65rem',
+                color: 'var(--text-dark)', fontFamily: 'var(--font-family-mono)'
+              }}>
+                <span>95% CI:</span>
+                <span style={{ color: 'var(--text-secondary)' }}>
+                  {predictionResult.confidence.low} – {predictionResult.confidence.high}
+                </span>
+              </div>
+            )}
           </GlassPanel>
 
           <GlassPanel className="sim-out-card">
@@ -264,6 +429,48 @@ export default function PredictionArea() {
           </GlassPanel>
         </div>
 
+        {/* Feature Importance Bar (shown after prediction) */}
+        {predictionResult && (
+          <GlassPanel style={{ padding: '0.75rem 1rem', marginBottom: '0' }}>
+            <div style={{ 
+              display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.5rem',
+              fontSize: '0.7rem', fontWeight: 600, textTransform: 'uppercase',
+              letterSpacing: '0.05em', color: 'var(--text-secondary)'
+            }}>
+              <TrendingUp size={12} />
+              Neural Network Feature Importance
+            </div>
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              {[
+                { label: 'Unemployment', value: predictionResult.featureImportance.unemployment, color: '#ef4444' },
+                { label: 'Income', value: predictionResult.featureImportance.income, color: '#f59e0b' },
+                { label: 'Lighting', value: predictionResult.featureImportance.lighting, color: '#3b82f6' },
+                { label: 'Patrol', value: predictionResult.featureImportance.patrol, color: '#10b981' },
+              ].map(feat => (
+                <div key={feat.label} style={{ flex: '1 1 0', minWidth: '80px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.6rem', color: 'var(--text-dark)', marginBottom: '0.2rem' }}>
+                    <span>{feat.label}</span>
+                    <span style={{ fontFamily: 'var(--font-family-mono)' }}>{(feat.value * 100).toFixed(1)}%</span>
+                  </div>
+                  <div style={{
+                    height: '4px', borderRadius: '2px',
+                    background: 'rgba(255,255,255,0.08)',
+                    overflow: 'hidden'
+                  }}>
+                    <div style={{
+                      width: `${feat.value * 100}%`,
+                      height: '100%',
+                      background: feat.color,
+                      borderRadius: '2px',
+                      transition: 'width 0.5s ease'
+                    }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </GlassPanel>
+        )}
+
         {/* Dynamic Comparison Bar Chart */}
         <GlassPanel style={{ padding: '1.25rem', height: '220px' }}>
           <Bar data={comparisonData} options={comparisonOptions} />
@@ -272,31 +479,45 @@ export default function PredictionArea() {
         {/* Simulated Neural Terminal */}
         <div className="terminal-log-card">
           <div className="term-header">
-            <span>NEURAL NET FORECAST MODEL EXECUTION SHELL</span>
+            <span>TENSORFLOW.JS NEURAL NETWORK EXECUTION SHELL</span>
             <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+              {isModelTrained && (
+                <span style={{ 
+                  fontSize: '0.55rem', padding: '0.1rem 0.35rem',
+                  background: 'rgba(16, 185, 129, 0.15)',
+                  border: '1px solid rgba(16, 185, 129, 0.3)',
+                  borderRadius: '3px', color: 'var(--color-success)',
+                  marginRight: '0.3rem'
+                }}>
+                  ML-POWERED
+                </span>
+              )}
               <Activity size={10} style={{ animation: 'markerPulseRed 1s infinite' }} />
               ACTIVE
             </span>
           </div>
           <div className="term-body">
             {terminalLogs.length === 0 ? (
-              <span style={{ color: 'var(--text-dark)' }}>[READY] Sliders configured. Execute model trigger above.</span>
+              <span style={{ color: 'var(--text-dark)' }}>
+                {isModelTrained 
+                  ? '[READY] Neural network model cached. Adjust sliders and run inference.' 
+                  : '[READY] Click "Train & Execute Model" to train the neural network on 800+ crime data samples.'}
+              </span>
             ) : (
               terminalLogs.map((log, index) => {
-                let colorClass = '';
-                if (log.startsWith('[COMPLETED]')) colorClass = 'text-success';
-                else if (log.startsWith('[RESET]')) colorClass = 'text-blue';
-                else if (log.startsWith('[INITIALIZING]')) colorClass = 'text-dark';
+                let logColor: string | undefined;
+                if (log.startsWith('[COMPLETED]') || log.startsWith('[TRAINED]')) logColor = 'var(--color-success)';
+                else if (log.startsWith('[RESET]')) logColor = 'var(--color-blue)';
+                else if (log.startsWith('[EPOCH')) logColor = '#f59e0b';
+                else if (log.startsWith('[RESULT]')) logColor = 'var(--color-success)';
+                else if (log.startsWith('[IMPORTANCE]')) logColor = '#a78bfa';
+                else if (log.startsWith('[DATASET]')) logColor = '#38bdf8';
+                else if (log.startsWith('[ARCHITECTURE]')) logColor = '#c084fc';
+                else if (log.startsWith('[INITIALIZING]') || log.startsWith('[MODEL]')) logColor = '#64748b';
 
                 return (
                   <div key={index} style={{ marginBottom: '0.2rem' }}>
-                    <span 
-                      style={{ 
-                        color: log.startsWith('[COMPLETED]') ? 'var(--color-success)' : 
-                               log.startsWith('[RESET]') ? 'var(--color-blue)' : 
-                               log.startsWith('[INITIALIZING]') ? '#64748b' : undefined 
-                      }}
-                    >
+                    <span style={{ color: logColor }}>
                       {log}
                     </span>
                   </div>
