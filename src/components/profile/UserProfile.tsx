@@ -63,7 +63,7 @@ export default function UserProfile() {
     if (!currentUser) return;
     setLogsLoading(true);
     try {
-      const allLogs = await fetchAuditLogs();
+      const allLogs = await fetchAuditLogs(currentUser.username);
       const userLogs = allLogs.filter(
         (log: any) => log.user.trim().toLowerCase() === currentUser.username.trim().toLowerCase()
       );

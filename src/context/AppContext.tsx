@@ -760,14 +760,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
       await Promise.all(usernames.map(async (uname) => {
         try {
           const activeSessionId = await fetchDbValue(`active_session_${uname}`);
-          if (activeSessionId && activeSessionId !== 'terminated') {
-            const rawLogs = await fetchDbValue(`audit_logs_${uname}`);
-            if (rawLogs) {
-              const decoded = decodeLogs(rawLogs);
-              if (decoded.length > 0) {
-                // Only return the most recent log of the active session
-                allLogs.push(decoded[0]);
-              }
+          const isActive = !!(activeSessionId && activeSessionId !== 'terminated');
+          
+          const rawLogs = await fetchDbValue(`audit_logs_${uname}`);
+          if (rawLogs) {
+            const decoded = decodeLogs(rawLogs);
+            if (decoded.length > 0) {
+              // Set active status only on the most recent log of active sessions
+              decoded.forEach((log, idx) => {
+                log.active = (idx === 0 && isActive);
+              });
+              allLogs.push(...decoded);
             }
           }
         } catch (e) {
@@ -809,6 +812,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
             setSessionTerminationReason('new-login');
             logout();
           }
+        } else {
+          // If remote session is missing/empty but client is authenticated, restore the active session ID in the remote DB
+          await updateDbValue(`active_session_${username.trim().toLowerCase()}`, localSessionId);
         }
       } catch (err) {
         console.error('Error polling remote session state:', err);

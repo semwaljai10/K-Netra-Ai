@@ -66,7 +66,7 @@ export default function AdminPanel() {
   const loadLogs = async (search?: string) => {
     setLoading(true);
     const data = await fetchAuditLogs(search);
-    setLogs(data);
+    setLogs(data.filter((log: any) => log.active));
     setLoading(false);
   };
 
@@ -236,7 +236,7 @@ export default function AdminPanel() {
           </h2>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1rem' }}>
             {operatorStatuses.map((op, idx) => {
-              const hasLog = op.lastLog !== null;
+              const hasLog = op.lastLog !== null && op.lastLog.active;
               const opIsAdmin = op.isAdmin;
               return (
                 <GlassPanel key={idx} style={{ padding: '1rem', margin: 0, border: '1px solid rgba(255,255,255,0.05)', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
@@ -663,7 +663,7 @@ export default function AdminPanel() {
                   const isL2Admin = targetUserObj && targetUserObj.level === 2;
 
                   // L2 Admin can terminate normal users or L1 Admin sessions, but not L2 Admins or self
-                  const canTerminate = currentUser?.level === 2 && !isSelf && !isL2Admin;
+                  const canTerminate = currentUser?.level === 2 && !isSelf && !isL2Admin && log.active;
 
                   return (
                     <tr key={index}>
