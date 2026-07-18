@@ -3269,3 +3269,101 @@ tr:hover td {
 .sm-password-toggle-btn:focus-visible {
   color: var(--color-blue);
 }
+
+/* Report Incident Navigation Buttons Custom Styles */
+.report-nav-btn-container {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  cursor: pointer;
+  user-select: none;
+  transition: all var(--transition-normal);
+  padding: 0.25rem;
+  border-radius: 8px;
+  outline: none;
+}
+
+.report-nav-circle-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid var(--panel-border);
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--text-muted);
+  font-size: 1.1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-normal);
+  outline: none;
+}
+
+.report-nav-btn-label {
+  font-size: 0.95rem;
+  color: var(--text-muted);
+  font-weight: 600;
+  transition: all var(--transition-normal);
+}
+
+/* Hover effects for Next and Previous with POP UP in green */
+.report-nav-btn-container:hover {
+  transform: translateY(-3px) scale(1.05); /* "pop up" / hover translate up + scale effect */
+}
+
+.report-nav-btn-container:hover .report-nav-circle-btn {
+  border-color: var(--color-success);
+  color: var(--color-success);
+  box-shadow: 0 0 15px var(--color-success-glow);
+  background: rgba(16, 185, 129, 0.08);
+}
+
+.report-nav-btn-container:hover .report-nav-btn-label {
+  color: var(--color-success);
+  text-shadow: 0 0 8px var(--color-success-glow);
+}
+
+.report-nav-btn-container:focus-visible {
+  outline: 2px solid var(--color-success);
+  outline-offset: 2px;
+}
+
+/* Active / Click effect */
+.report-nav-btn-container:active {
+  transform: translateY(0px) scale(0.97);
+}
+
+/* AI Tactical Insights Carousel Dots */
+.insight-dots-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 1.25rem;
+}
+
+.insight-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.15);
+  border: none;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  padding: 0;
+}
+
+.insight-dot:hover {
+  background: rgba(255, 255, 255, 0.4);
+}
+
+.insight-dot.active {
+  width: 24px;
+  height: 8px;
+  border-radius: 4px;
+  background: #ffffff;
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.4);
+}
+
+

@@ -2117,40 +2117,57 @@ export default function ReportIncident() {
           }}>
             <div>
               {currentStep > 1 && (
-                <button
-                  type="button"
-                  className="btn btn-secondary"
+                <div 
                   onClick={handlePrevious}
-                  style={{
-                    padding: '0.75rem 2rem',
-                    fontSize: '0.9rem',
-                    fontWeight: 'bold',
-                    cursor: 'pointer'
+                  className="report-nav-btn-container"
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      handlePrevious();
+                    }
                   }}
                 >
-                  Previous
-                </button>
+                  <button
+                    type="button"
+                    className="report-nav-circle-btn"
+                    tabIndex={-1}
+                  >
+                    &lt;
+                  </button>
+                  <span className="report-nav-btn-label">
+                    Previous
+                  </span>
+                </div>
               )}
             </div>
 
             <div>
               {currentStep < 4 ? (
-                <button
-                  type="button"
-                  className="btn btn-primary"
+                <div 
                   onClick={() => handleNext()}
-                  style={{
-                    padding: '0.75rem 2rem',
-                    fontSize: '0.9rem',
-                    fontWeight: 'bold',
-                    cursor: 'pointer',
-                    backgroundColor: 'var(--color-success)',
-                    borderColor: 'var(--color-success)',
-                    color: '#fff'
+                  className="report-nav-btn-container"
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      handleNext();
+                    }
                   }}
                 >
-                  Next Step
-                </button>
+                  <span className="report-nav-btn-label">
+                    Next Step
+                  </span>
+                  <button
+                    type="button"
+                    className="report-nav-circle-btn"
+                    tabIndex={-1}
+                  >
+                    &gt;
+                  </button>
+                </div>
               ) : (
                 <button
                   type="submit"
