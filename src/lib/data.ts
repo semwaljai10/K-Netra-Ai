@@ -6,6 +6,9 @@ import { adaptDataset, adaptSupabaseRecord, mapCaseStatusToConviction } from './
 // Re-export raw data for use by syndicateAnalysis module
 // The adapter transforms new-schema FIR records into legacy flat format
 export const rawCrimeData = adaptDataset(rawCrimeDataImport);
+export const rawCrimeDataMap = new Map<string, any>(
+  rawCrimeData.map((item: any) => [item.case_information.unique_id, item])
+);
 
 export { adaptSupabaseRecord, mapCaseStatusToConviction };
 
@@ -290,140 +293,7 @@ const getStatus = (convictionStatus: string): 'Open' | 'Dispatched' | 'Resolved'
   return "Open";
 };
 
-// Parse raw JSON records
-export const MOCK_INCIDENTS: Incident[] = [];
-const offenderMap = new Map<string, {
-  name: string;
-  incidents: any[];
-}>();
-
-rawCrimeData.forEach((item: any) => {
-  const id = item.case_information.unique_id;
-  const type = item.incident_data.crime_type;
-  const location = item.case_information.location;
-  const policeStation = item.investigation_data.police_station;
-  const districtId = getDistrictId(location, policeStation);
-  const severity = getSeverity(type);
-  const timestamp = item.case_information.date_time;
-  const coords: [number, number] = [
-    item.geospatial_data.latitude,
-    item.geospatial_data.longitude
-  ];
-  
-  const suspects = item.accusedSuspects || (item._source?.all_suspects) || [item.suspect_details];
-  
-  suspects.forEach((sus: any) => {
-    const suspectName = sus?.name;
-    if (suspectName && suspectName !== 'None' && suspectName !== 'Unknown') {
-      if (!offenderMap.has(suspectName)) {
-        offenderMap.set(suspectName, { name: suspectName, incidents: [] });
-      }
-      offenderMap.get(suspectName)!.incidents.push(item);
-    }
-  });
-  
-  const sections = item.case_information.ipc_bns_sections.join(' / ');
-  const victimName = item.victim_details.name;
-  const victimAge = item.victim_details.age;
-  const victimGender = item.victim_details.gender;
-  const relation = item.victim_details.relation_to_suspect;
-  const officer = item.investigation_data.investigating_officer_id;
-  const weapon = item.incident_data.weapon_used;
-  const vehicle = item.incident_data.vehicle_no;
-  const evidence = item.investigation_data.evidence_summary;
-  
-  const description = `FIR No. ${item.case_information.fir_no} registered under sections: ${sections}. Incident location: ${location}. Victim: ${victimName} (${victimAge}, ${victimGender}), relation: ${relation}. Officer: ${officer} at ${policeStation}. Weapon: ${weapon}. Vehicle: ${vehicle}. Evidence: ${evidence}.`;
-  
-  MOCK_INCIDENTS.push({
-    id,
-    type,
-    districtId,
-    severity,
-    timestamp,
-    coords,
-    offenderId: null,
-    status: getStatus(item.legal_outcome.conviction_status),
-    description,
-    
-    // Mapped fields from dataAdapter
-    firNumber: item.firNumber,
-    policeStation: item.policeStation,
-    investigatingOfficer: item.investigatingOfficer,
-    complainant: item.complainant,
-    accusedSuspects: item.accusedSuspects,
-    victims: item.victims,
-    witnesses: item.witnesses,
-    evidenceCollected: item.evidenceCollected,
-    analyticalTags: item.analyticalTags,
-    case_information: item.case_information,
-    suspect_details: item.suspect_details,
-    victim_details: item.victim_details,
-    incident_data: item.incident_data,
-    investigation_data: item.investigation_data,
-    communication_data: item.communication_data,
-    legal_outcome: item.legal_outcome,
-  });
-});
-
-// Map unique suspects to Offenders list
-const offenderList: Offender[] = Array.from(offenderMap.values()).map((off, index) => {
-  const id = `OFF-${String(index + 1).padStart(3, '0')}`;
-  const name = off.name;
-  const alias = name.split(' ')[0];
-  const hash = getHashCode(name);
-  
-  // Try to find age and gender if defined on any raw incident record for this offender
-  const incidentWithAge = off.incidents.find((inc: any) => inc.suspect_details?.age != null);
-  const rawAge = incidentWithAge ? incidentWithAge.suspect_details.age : null;
-  const age = (rawAge != null && isNaN(Number(rawAge))) ? rawAge : (rawAge ? Number(rawAge) : 22 + (hash % 38));
-  
-  const incidentWithGender = off.incidents.find((inc: any) => inc.suspect_details?.gender != null);
-  const gender = incidentWithGender ? incidentWithGender.suspect_details.gender : undefined;
-
-  const primaryCrime = off.incidents[0].incident_data.crime_type;
-  const arrestCount = off.incidents.length;
-  
-  const history: OffenderHistory[] = off.incidents.map((incItem: any) => {
-    const districtName = incItem.case_information.location.split(',').pop()?.trim() || "Karnataka";
-    return {
-      date: incItem.case_information.date_time.substring(0, 10),
-      crime: incItem.incident_data.crime_subcategory,
-      location: districtName,
-      status: incItem.legal_outcome.conviction_status
-    };
-  });
-  
-  history.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-  
-  const riskScore = Math.min(95, 55 + arrestCount * 5 + (hash % 10));
-  const latestOutcome = history[history.length - 1]?.status;
-  const status = latestOutcome === 'Convicted'
-    ? 'Incarcerated'
-    : (latestOutcome === 'Acquitted' ? 'Parole' : 'Active');
-  
-  const mainLoc = off.incidents[0].case_information.location.split(',').pop()?.trim() || "Karnataka";
-  const bio = `Tracked in connection with syndicates operating in ${mainLoc}. Modus operandi highlights involvement in ${primaryCrime.toLowerCase()} networks.`;
-  
-  return {
-    id,
-    name,
-    alias,
-    age,
-    gender,
-    status,
-    riskScore,
-    primaryCrime,
-    arrestCount,
-    avatar: `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(name)}`,
-    associates: [],
-    history,
-    bio
-  };
-});
-
-// ─── Syndicate Linking Engine ─────────────────────────────────────────────
-// Associates are now computed via the multi-signal weighted scoring system
-// in syndicateAnalysis.ts. The old shared-IO linking is replaced.
+// ─── Syndicate Analysis Imports ───────────────────────────────────────────
 import {
   buildSyndicateLinks,
   detectSyndicates,
@@ -433,34 +303,6 @@ import {
   SyndicateCluster,
   CentralityData,
 } from './syndicateAnalysis';
-
-const syndicateLinks = buildSyndicateLinks(offenderList, rawCrimeData);
-const updatedOffenderList = updateOffenderAssociates(offenderList, syndicateLinks);
-// Replace offenderList entries with updated associates
-updatedOffenderList.forEach((updated, idx) => {
-  offenderList[idx].associates = updated.associates;
-});
-
-// Update offenderId inside incidents list
-const offenderNameToIdMap = new Map<string, string>();
-offenderList.forEach(off => offenderNameToIdMap.set(off.name, off.id));
-
-MOCK_INCIDENTS.forEach(inc => {
-  const originalRecord = rawCrimeData.find(item => item.case_information.unique_id === inc.id);
-  if (originalRecord) {
-    const sName = originalRecord.suspect_details?.name || originalRecord.accused_suspects?.[0]?.name;
-    if (sName && sName !== 'None' && sName !== 'Unknown') {
-      inc.offenderId = offenderNameToIdMap.get(sName) || null;
-    }
-  }
-});
-
-export const MOCK_OFFENDERS = offenderList;
-
-// Syndicate analysis exports
-export const MOCK_SYNDICATE_LINKS: SyndicateLink[] = syndicateLinks;
-export const MOCK_SYNDICATE_CLUSTERS: SyndicateCluster[] = detectSyndicates(offenderList, syndicateLinks);
-export const MOCK_CENTRALITY_MAP: Map<string, CentralityData> = computeCentrality(offenderList, syndicateLinks);
 
 // Re-export types for consumers
 export type { SyndicateLink, SyndicateCluster, CentralityData };
@@ -614,8 +456,14 @@ export function processRawIncidentsData(rawCases: any[]) {
   const nameToIdMap = new Map<string, string>();
   offendersList.forEach(off => nameToIdMap.set(off.name, off.id));
   
+  const rawCasesMap = new Map<string, any>();
+  rawCases.forEach(item => {
+    const uid = item.case_information?.unique_id;
+    if (uid) rawCasesMap.set(uid, item);
+  });
+
   incidentsList.forEach(inc => {
-    const originalRecord = rawCases.find(item => item.case_information.unique_id === inc.id);
+    const originalRecord = rawCasesMap.get(inc.id);
     if (originalRecord) {
       const sName = originalRecord.suspect_details?.name || originalRecord.accusedSuspects?.[0]?.name || originalRecord.accused_suspects?.[0]?.name;
       if (sName && sName !== 'None' && sName !== 'Unknown') {

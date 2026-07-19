@@ -7,9 +7,11 @@
  *   3. TrendForecaster: Exponential smoothing for time-series forecast
  */
 
-import * as tf from '@tensorflow/tfjs';
+import type * as tfType from '@tensorflow/tfjs';
 import { generateTrainingDataset, getDatasetStats, TrainingSample } from './crimeTrainingData';
 import type { Incident, Anomaly } from './data';
+
+let tf: typeof import('@tensorflow/tfjs') | null = null;
 
 // ─── Types ──────────────────────────────────────────────────────────────────────
 
@@ -63,7 +65,7 @@ function denormalize(value: number, params: NormParams): number {
 // ─── 1. Crime Rate Predictor ────────────────────────────────────────────────────
 
 class CrimePredictor {
-  private model: tf.Sequential | null = null;
+  private model: tfType.Sequential | null = null;
   private normParams: {
     unemployment: NormParams;
     income: NormParams;
@@ -87,6 +89,11 @@ class CrimePredictor {
   async train(onEpochEnd?: (log: TrainingLog) => void): Promise<void> {
     this._status = 'training';
     this.trainingLogs = [];
+
+    // Load TensorFlow dynamically
+    if (!tf) {
+      tf = await import('@tensorflow/tfjs');
+    }
 
     // Generate dataset
     this.dataset = generateTrainingDataset();
@@ -178,7 +185,7 @@ class CrimePredictor {
    * Predict crime rate for given socio-economic inputs
    */
   predict(unemployment: number, income: number, lighting: number, patrol: number): PredictionResult {
-    if (!this.model || !this.normParams || this._status !== 'ready') {
+    if (!this.model || !this.normParams || this._status !== 'ready' || !tf) {
       // Fallback to simple calculation if model isn't ready
       return {
         predictedRate: 46.0,
@@ -194,7 +201,7 @@ class CrimePredictor {
       normalize(patrol, this.normParams.patrol),
     ]]);
 
-    const prediction = this.model.predict(inputTensor) as tf.Tensor;
+    const prediction = this.model.predict(inputTensor) as tfType.Tensor;
     const normalizedValue = prediction.dataSync()[0];
     const predictedRate = denormalize(normalizedValue, this.normParams.crimeRate);
 
@@ -228,7 +235,7 @@ class CrimePredictor {
    * Compute feature importance by measuring prediction sensitivity to each input
    */
   private computeFeatureImportance(u: number, i: number, l: number, p: number) {
-    if (!this.model || !this.normParams) {
+    if (!this.model || !this.normParams || !tf) {
       return { unemployment: 0.35, income: 0.25, lighting: 0.20, patrol: 0.20 };
     }
 
@@ -240,12 +247,12 @@ class CrimePredictor {
       normalize(p, this.normParams.patrol),
     ];
 
-    const basePred = (this.model.predict(tf.tensor2d([baseInput])) as tf.Tensor).dataSync()[0];
+    const basePred = (this.model.predict(tf.tensor2d([baseInput])) as tfType.Tensor).dataSync()[0];
 
     const sensitivities = baseInput.map((val, idx) => {
       const perturbedInput = [...baseInput];
       perturbedInput[idx] = val + delta;
-      const perturbedPred = (this.model!.predict(tf.tensor2d([perturbedInput])) as tf.Tensor).dataSync()[0];
+      const perturbedPred = (this.model!.predict(tf!.tensor2d([perturbedInput])) as tfType.Tensor).dataSync()[0];
       return Math.abs(perturbedPred - basePred) / delta;
     });
 
