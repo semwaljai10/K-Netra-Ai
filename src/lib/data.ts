@@ -286,7 +286,7 @@ const getSeverity = (crimeType: string): 'Critical' | 'High' | 'Medium' | 'Low' 
 const getStatus = (convictionStatus: string): 'Open' | 'Dispatched' | 'Resolved' => {
   const status = convictionStatus.toLowerCase();
   if (status.includes("convicted") || status.includes("acquitted") || status.includes("resolved") || status.includes("closed")) return "Resolved";
-  if (status.includes("trial") || status.includes("pending") || status.includes("dispatched")) return "Dispatched";
+  if (status.includes("trial") || status.includes("pending") || status.includes("dispatched") || status.includes("transferred") || status.includes("charge sheet")) return "Dispatched";
   return "Open";
 };
 
@@ -541,7 +541,7 @@ export function processRawIncidentsData(rawCases: any[]) {
       incident_data: item.incident_data,
       investigation_data: item.investigation_data,
       communication_data: item.communication_data,
-      statusModification: item.statusModification,
+      statusModification: item.statusModification || item.status_modification,
       legal_outcome: item.legal_outcome,
     });
   });

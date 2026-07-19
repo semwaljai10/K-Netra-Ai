@@ -58,8 +58,42 @@ export async function PATCH(
 
     statusMod.previousStatus = currentRecord.case_status;
 
+    // Helper to map camelCase closureDetails from client to snake_case closure_details for DB JSON
+    const mapClosureDetailsToSnakeCase = (cd: any) => {
+      if (!cd) return null;
+      return {
+        closure_date: cd.closureDate || null,
+        closure_sub_status: cd.closureSubStatus || null,
+        reason_for_closure: cd.reasonForClosure || null,
+        closing_authority: cd.closingAuthority ? {
+          officer_name: cd.closingAuthority.officerName || null,
+          designation: cd.closingAuthority.designation || null,
+          police_station: cd.closingAuthority.policeStation || null,
+          jurisdiction: cd.closingAuthority.jurisdiction || null,
+        } : null,
+        outcome: cd.outcome ? {
+          verdict: cd.outcome.verdict || null,
+          court_name: cd.outcome.courtName || null,
+          case_number_court: cd.outcome.caseNumberCourt || null,
+          sentence_duration: cd.outcome.sentenceDuration || null,
+          fine_amount: cd.outcome.fineAmount || null,
+          judgment_date: cd.outcome.judgmentDate || null,
+        } : null,
+        final_remarks: cd.finalRemarks || null,
+      };
+    };
+
     // Update the case_status inside the JSONB data column too
-    const updatedData = { ...currentRecord.data, case_status };
+    const updatedData = { 
+      ...currentRecord.data, 
+      case_status,
+      legal_outcome: {
+        ...(currentRecord.data?.legal_outcome || {}),
+        conviction_status: case_status,
+        charge_sheet_filed: chargeSheetFiled !== undefined ? chargeSheetFiled : (currentRecord.data?.legal_outcome?.charge_sheet_filed || false),
+      },
+      closure_details: case_status === 'Closed' ? (mapClosureDetailsToSnakeCase(closureDetails) || currentRecord.data?.closure_details || null) : null
+    };
 
     // Determine severity if crime type present
     const crimeType = currentRecord.data?.crime_classification?.crime_type || '';

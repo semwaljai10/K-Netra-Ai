@@ -1008,8 +1008,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
             charge_sheet_filed: chargeSheetFiled !== undefined ? chargeSheetFiled : (item.legal_outcome?.charge_sheet_filed || false),
             conviction_status: newRawStatus
           },
+          statusModification: {
+            previousStatus: item.legal_outcome?.conviction_status || 'Open',
+            newStatus: newRawStatus,
+            remarks,
+            modifiedAt: new Date().toISOString(),
+            modifiedBy,
+            modifiedByUserId,
+            closureDetails: closureDetails || undefined,
+          },
           status_modification: {
-            previousStatus: item.case_status || 'Open',
+            previousStatus: item.legal_outcome?.conviction_status || 'Open',
             newStatus: newRawStatus,
             remarks,
             modifiedAt: new Date().toISOString(),

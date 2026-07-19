@@ -4,7 +4,8 @@ import React, { useState, useEffect } from 'react';
 import { useApp } from '@/context/AppContext';
 import GlassPanel from './GlassPanel';
 import { X, ChevronRight, ChevronLeft, ShieldCheck, Lock, AlertTriangle, CheckCircle, Edit3, Eye, EyeOff } from 'lucide-react';
-import type { Incident } from '@/lib/data';
+import { MOCK_DISTRICTS, type Incident } from '@/lib/data';
+import { DISTRICT_STATIONS } from '@/lib/stations';
 import DateTimePicker from './DateTimePicker';
 
 const RAW_STATUSES = [
@@ -100,8 +101,25 @@ export default function StatusModifyModal({ incident, onClose }: StatusModifyMod
   const [reasonForClosure, setReasonForClosure] = useState('');
   const [officerName, setOfficerName] = useState('');
   const [designation, setDesignation] = useState('');
-  const [closingPoliceStation, setClosingPoliceStation] = useState('');
-  const [jurisdiction, setJurisdiction] = useState('');
+  const [jurisdiction, setJurisdiction] = useState(incident.districtId || '');
+  const [closingPoliceStation, setClosingPoliceStation] = useState(incident.policeStation?.name || '');
+
+  const handleDistrictChange = (newDistrictId: string) => {
+    setJurisdiction(newDistrictId);
+    const stations = DISTRICT_STATIONS[newDistrictId] || [];
+    if (stations.length > 0) {
+      setClosingPoliceStation(stations[0].name);
+    } else {
+      setClosingPoliceStation('');
+    }
+  };
+
+  const closingPoliceStationCode = React.useMemo(() => {
+    if (!jurisdiction || !closingPoliceStation) return '';
+    const stations = DISTRICT_STATIONS[jurisdiction] || [];
+    const found = stations.find(s => s.name === closingPoliceStation);
+    return found ? found.code : '';
+  }, [jurisdiction, closingPoliceStation]);
   const [verdict, setVerdict] = useState('');
   const [courtName, setCourtName] = useState('');
   const [caseNumberCourt, setCaseNumberCourt] = useState('');
@@ -148,8 +166,14 @@ export default function StatusModifyModal({ incident, onClose }: StatusModifyMod
 
   const handleParentStatusChange = (newParent: string) => {
     setSelectedParentStatus(newParent);
+    if (newParent === 'Open') {
+      setChargeSheetFiled(false);
+    }
     if (newParent === initialParent) {
       setSelectedSubStatus(initialSub);
+      if (newParent !== 'Open') {
+        setChargeSheetFiled(initialChargeSheetFiled);
+      }
     } else {
       if (newParent === 'Open') {
         setSelectedSubStatus('Under Investigation');
@@ -217,7 +241,8 @@ export default function StatusModifyModal({ incident, onClose }: StatusModifyMod
           officerName,
           designation,
           policeStation: closingPoliceStation,
-          jurisdiction,
+          policeStationCode: closingPoliceStationCode,
+          jurisdiction: MOCK_DISTRICTS[jurisdiction]?.name || jurisdiction,
         },
         outcome: (verdict || courtName || caseNumberCourt) ? {
           verdict: verdict || undefined,
@@ -237,7 +262,7 @@ export default function StatusModifyModal({ incident, onClose }: StatusModifyMod
         result.name || username,
         result.username || username,
         closureDetails,
-        chargeSheetFiled
+        selectedParentStatus === 'Open' ? false : chargeSheetFiled
       );
 
       setSuccess(true);
@@ -388,23 +413,24 @@ export default function StatusModifyModal({ incident, onClose }: StatusModifyMod
               </div>
 
               {/* Charge Sheet Filed Checkbox */}
-              <div className="sm-field-group" style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginTop: '0.5rem', marginBottom: '0.5rem' }}>
+              <div className="sm-field-group" style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginTop: '0.5rem', marginBottom: '0.5rem', opacity: selectedParentStatus === 'Open' ? 0.5 : 1 }}>
                 <input
                   type="checkbox"
                   id="chargeSheetFiled"
-                  checked={chargeSheetFiled}
+                  checked={selectedParentStatus === 'Open' ? false : chargeSheetFiled}
+                  disabled={selectedParentStatus === 'Open'}
                   onChange={(e) => setChargeSheetFiled(e.target.checked)}
                   style={{
                     width: '18px',
                     height: '18px',
-                    cursor: 'pointer',
+                    cursor: selectedParentStatus === 'Open' ? 'not-allowed' : 'pointer',
                     accentColor: 'var(--color-blue)',
                     borderRadius: '4px',
                     border: '1px solid var(--panel-border)'
                   }}
                 />
-                <label htmlFor="chargeSheetFiled" className="sm-label" style={{ margin: 0, cursor: 'pointer', userSelect: 'none', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                  Charge Sheet Filed: <strong style={{ color: chargeSheetFiled ? 'var(--color-success)' : 'var(--text-muted)' }}>{chargeSheetFiled ? 'YES' : 'NO'}</strong>
+                <label htmlFor="chargeSheetFiled" className="sm-label" style={{ margin: 0, cursor: selectedParentStatus === 'Open' ? 'not-allowed' : 'pointer', userSelect: 'none', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                  Charge Sheet Filed: <strong style={{ color: (selectedParentStatus !== 'Open' && chargeSheetFiled) ? 'var(--color-success)' : 'var(--text-muted)' }}>{(selectedParentStatus !== 'Open' && chargeSheetFiled) ? 'YES' : 'NO'}</strong>
                 </label>
               </div>
 
@@ -508,24 +534,36 @@ export default function StatusModifyModal({ incident, onClose }: StatusModifyMod
 
               <div className="sm-field-row">
                 <div className="sm-field-group" style={{ flex: 1 }}>
-                  <label className="sm-label">Police Station <span className="sm-required">*</span></label>
-                  <input
-                    type="text"
-                    className="sm-input"
-                    placeholder="Closing police station"
-                    value={closingPoliceStation}
-                    onChange={(e) => setClosingPoliceStation(e.target.value)}
-                  />
+                  <label className="sm-label">Jurisdiction (District) <span className="sm-required">*</span></label>
+                  <select
+                    className="sm-select"
+                    value={jurisdiction}
+                    onChange={(e) => handleDistrictChange(e.target.value)}
+                  >
+                    <option value="">Select district...</option>
+                    {Object.values(MOCK_DISTRICTS).map(d => (
+                      <option key={d.id} value={d.id}>{d.name}</option>
+                    ))}
+                  </select>
                 </div>
                 <div className="sm-field-group" style={{ flex: 1 }}>
-                  <label className="sm-label">Jurisdiction <span className="sm-required">*</span></label>
-                  <input
-                    type="text"
-                    className="sm-input"
-                    placeholder="e.g. Bengaluru Urban"
-                    value={jurisdiction}
-                    onChange={(e) => setJurisdiction(e.target.value)}
-                  />
+                  <label className="sm-label">Police Station <span className="sm-required">*</span></label>
+                  <select
+                    className="sm-select"
+                    value={closingPoliceStation}
+                    onChange={(e) => setClosingPoliceStation(e.target.value)}
+                    disabled={!jurisdiction}
+                  >
+                    <option value="">Select police station...</option>
+                    {(DISTRICT_STATIONS[jurisdiction] || []).map(s => (
+                      <option key={s.code} value={s.name}>{s.name}</option>
+                    ))}
+                  </select>
+                  {closingPoliceStationCode && (
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '0.2rem', display: 'block' }}>
+                      Station Code: <strong style={{ color: 'var(--color-blue)', fontFamily: 'var(--font-family-mono)' }}>{closingPoliceStationCode}</strong>
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -574,11 +612,10 @@ export default function StatusModifyModal({ incident, onClose }: StatusModifyMod
                 </div>
                 <div className="sm-field-group" style={{ flex: 1 }}>
                   <label className="sm-label">Judgment Date</label>
-                  <input
-                    type="date"
-                    className="sm-input"
+                  <DateTimePicker
                     value={judgmentDate}
-                    onChange={(e) => setJudgmentDate(e.target.value)}
+                    onChange={(val) => setJudgmentDate(val)}
+                    placeholder="Select Judgment Date"
                   />
                 </div>
               </div>

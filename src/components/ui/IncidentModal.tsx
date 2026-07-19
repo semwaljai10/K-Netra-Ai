@@ -496,7 +496,8 @@ export default function IncidentModal() {
                             <div><strong>Officer Name:</strong> {cd.closing_authority.officer_name || cd.closing_authority.officerName || 'N/A'}</div>
                             <div><strong>Designation:</strong> {cd.closing_authority.designation || 'N/A'}</div>
                             <div><strong>Police Station:</strong> {cd.closing_authority.police_station || cd.closing_authority.policeStation || 'N/A'}</div>
-                            <div><strong>Jurisdiction:</strong> {cd.closing_authority.jurisdiction || 'N/A'}</div>
+                            <div><strong>Station Code:</strong> {cd.closing_authority.police_station_code || cd.closing_authority.policeStationCode || 'N/A'}</div>
+                            <div style={{ gridColumn: 'span 2' }}><strong>Jurisdiction (District):</strong> {cd.closing_authority.jurisdiction || 'N/A'}</div>
                           </div>
                         </div>
                       )}
