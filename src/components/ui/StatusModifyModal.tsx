@@ -559,11 +559,6 @@ export default function StatusModifyModal({ incident, onClose }: StatusModifyMod
                       <option key={s.code} value={s.name}>{s.name}</option>
                     ))}
                   </select>
-                  {closingPoliceStationCode && (
-                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '0.2rem', display: 'block' }}>
-                      Station Code: <strong style={{ color: 'var(--color-blue)', fontFamily: 'var(--font-family-mono)' }}>{closingPoliceStationCode}</strong>
-                    </span>
-                  )}
                 </div>
               </div>
 
