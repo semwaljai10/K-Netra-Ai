@@ -567,6 +567,18 @@ export default function StatusModifyModal({ incident, onClose }: StatusModifyMod
                 </div>
               </div>
 
+              <div className="sm-field-row" style={{ marginTop: '-0.3rem', marginBottom: '0.75rem', display: 'flex', gap: '1rem' }}>
+                <div style={{ flex: 1, padding: '0.4rem 0.6rem', background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.05)', borderRadius: '6px', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                  Origin District: <strong style={{ color: '#00f0ff', marginLeft: '0.25rem' }}>{MOCK_DISTRICTS[incident.districtId]?.name || incident.districtId}</strong>
+                </div>
+                <div style={{ flex: 1, padding: '0.4rem 0.6rem', background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.05)', borderRadius: '6px', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                  Origin Station: <strong style={{ color: '#00f0ff', marginLeft: '0.25rem' }}>{incident.policeStation?.name || 'N/A'}</strong> 
+                  {incident.policeStation?.stationCode && (
+                    <span style={{ color: 'var(--text-muted)', fontSize: '0.65rem', marginLeft: '0.25rem', opacity: 0.8, fontFamily: 'var(--font-family-mono)' }}>({incident.policeStation.stationCode})</span>
+                  )}
+                </div>
+              </div>
+
               <div className="sm-section-header" style={{ marginTop: '0.75rem' }}>
                 <ShieldCheck size={16} />
                 Outcome (Optional)
