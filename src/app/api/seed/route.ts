@@ -21,6 +21,7 @@ export async function GET(request: Request) {
 
     const { searchParams } = new URL(request.url);
     const force = searchParams.get('force') === 'true';
+    const usersOnly = searchParams.get('users') === 'true';
     const errors: string[] = [];
 
     // =========================================================================
@@ -84,10 +85,54 @@ export async function GET(request: Request) {
         .from('session_store')
         .upsert({ key: 'normal_users', value: normalUsersStr, updated_at: new Date().toISOString() });
 
+      // Upsert default users into user_accounts table
+      try {
+        await supabase
+          .from('user_accounts')
+          .upsert([
+            {
+              username: 'a11022004',
+              password: encryptedPassword,
+              must_change_password: false,
+              name: 'Administrator',
+              role: 'System administrator L2',
+              is_admin: true,
+              level: 2,
+              phone: '+91 98765 43210',
+              email: 'a11022004@k-netra.gov.in',
+              department: 'System Administration',
+              badge_number: 'BADGE-A-11022004'
+            },
+            {
+              username: 'v27022004',
+              password: encryptPassword('Mumbai4@143'),
+              must_change_password: false,
+              name: 'Officer A. Sharma',
+              role: 'Control Room',
+              is_admin: false,
+              level: 1,
+              phone: '+91 98765 43210',
+              email: 'v27022004@k-netra.gov.in',
+              department: 'Karnataka Tactical Unit',
+              badge_number: 'BADGE-V-27022004'
+            }
+          ]);
+      } catch (err: any) {
+        console.warn('[SUPABASE SEED] user_accounts table might not exist yet, skipping seeding to user_accounts. Run add_user_accounts.sql in Supabase SQL editor first.', err.message || err);
+      }
+
       if (adminError || normalError) {
         errors.push(`Seeding session_store failed: ${adminError?.message || ''} ${normalError?.message || ''}`);
       } else {
         console.log('[SUPABASE SEED] Successfully seeded default operator credentials.');
+      }
+
+      if (usersOnly) {
+        return NextResponse.json({
+          success: errors.length === 0,
+          message: 'Successfully seeded/reset operator credentials only (both user_accounts table and session_store).',
+          errors: errors.length > 0 ? errors : undefined
+        });
       }
     } catch (e: any) {
       errors.push(`Session store seed exception: ${e.message || e}`);

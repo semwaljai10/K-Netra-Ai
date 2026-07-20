@@ -14,8 +14,9 @@ export async function POST(request: Request) {
     if (action === 'get') {
       let supabaseValue = '';
       let fetchSuccess = false;
+      let isGenuinelyNotFoundInSupabase = false;
 
-      // 1. Try to fetch from Supabase if configured (wrapped in 2.5s timeout)
+      // 1. Try to fetch from Supabase if configured (wrapped in 5.0s timeout)
       if (isSupabaseConfigured()) {
         try {
           const { data, error } = await withTimeout(
@@ -24,24 +25,28 @@ export async function POST(request: Request) {
               .select('value')
               .eq('key', key)
               .single(),
-            2500
+            5000
           );
 
           if (!error && data) {
             supabaseValue = data.value;
             fetchSuccess = true;
-          } else if (error && error.code !== 'PGRST116') {
-            console.warn(`[SUPABASE] Query warning for key "${key}":`, error.message);
-          } else if (!error) {
+          } else if (error && error.code === 'PGRST116') {
+            // Succeeded in querying, but no record exists yet in Supabase
             fetchSuccess = true;
+            isGenuinelyNotFoundInSupabase = true;
+          } else {
+            if (error) {
+              console.warn(`[SUPABASE] Query warning for key "${key}":`, error.message);
+            }
           }
         } catch (err: any) {
           console.warn(`[SUPABASE] Exception querying key "${key}":`, err.message || err);
         }
       }
 
-      // 2. Fall back to legacy key-value store if not found or if database query failed
-      if (!fetchSuccess || !supabaseValue) {
+      // 2. Fall back to legacy key-value store if not found in Supabase or if Supabase query failed
+      if (!supabaseValue) {
         try {
           const url = `https://keyvalue.immanuel.co/api/KeyVal/GetValue/${legacyToken}/${key}?t=${Date.now()}`;
           const res = await fetch(url, { cache: 'no-store' });
@@ -54,15 +59,16 @@ export async function POST(request: Request) {
             if (data && data !== 'Value Not Found' && data !== 'Not Found' && !data.includes('error')) {
               supabaseValue = data;
               
-              // Seed the value to Supabase asynchronously only if configured
-              if (isSupabaseConfigured()) {
+              // Seed the value to Supabase ONLY if we succeeded in talking to Supabase but it was genuinely not found there.
+              // If the query had failed/timed out, do NOT overwrite Supabase with legacy data!
+              if (isSupabaseConfigured() && fetchSuccess && isGenuinelyNotFoundInSupabase) {
                 (async () => {
                   try {
                     const { error } = await withTimeout(
                       supabase
                         .from('session_store')
                         .upsert({ key, value: data, updated_at: new Date().toISOString() }),
-                      2500
+                      5000
                     );
                     if (error) {
                       console.warn(`[SUPABASE] Auto-migration caching failed for key "${key}":`, error.message);
@@ -92,7 +98,7 @@ export async function POST(request: Request) {
             supabase
               .from('session_store')
               .upsert({ key, value: String(value), updated_at: new Date().toISOString() }),
-            2500
+            5000
           );
 
           if (!error) {

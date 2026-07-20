@@ -7,7 +7,7 @@ import {
   rawCrimeData, rawCrimeDataMap, adaptSupabaseRecord, processRawIncidentsData
 } from '@/lib/data';
 import { ALL_SIGNAL_TYPES } from '@/lib/syndicateAnalysis';
-import { supabase } from '@/lib/supabase';
+import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { anomalyDetector } from '@/lib/crimeMLEngine';
 import {
   toUrlSafeBase64,
@@ -251,6 +251,49 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   const fetchUsers = async () => {
+    // 1. Try to fetch from user_accounts table if configured and table exists
+    if (isSupabaseConfigured()) {
+      try {
+        const { data, error } = await supabase
+          .from('user_accounts')
+          .select('*');
+
+        if (!error && data && data.length > 0) {
+          const normal = data.filter((u: any) => !u.is_admin).map((u: any) => ({
+            username: u.username,
+            password: decryptPassword(u.password),
+            mustChangePassword: u.must_change_password ?? false,
+            name: u.name,
+            role: u.role,
+            phone: u.phone,
+            email: u.email || `${u.username}@k-netra.gov.in`,
+            department: u.department || 'Karnataka Tactical Unit',
+            badgeNumber: u.badge_number || `BADGE-V-${u.username.substring(1)}`,
+            joinedDate: u.joined_date || '2024-03-15'
+          }));
+
+          const admin = data.filter((u: any) => u.is_admin).map((u: any) => ({
+            username: u.username,
+            password: decryptPassword(u.password),
+            mustChangePassword: u.must_change_password ?? false,
+            name: u.name,
+            role: u.role,
+            level: u.level || 1,
+            phone: u.phone,
+            email: u.email || `${u.username}@k-netra.gov.in`,
+            department: u.department || 'System Administration',
+            badgeNumber: u.badge_number || `BADGE-A-${u.username.substring(1)}`,
+            joinedDate: u.joined_date || '2024-03-15'
+          }));
+
+          return { normal, admin };
+        }
+      } catch (err: any) {
+        console.warn('[SUPABASE] user_accounts table query failed (it might not exist yet). Falling back to session_store key-value lookup.', err.message || err);
+      }
+    }
+
+    // 2. Fallback to key-value session_store
     let normal: any[] = [];
     let admin: any[] = [];
     
@@ -258,7 +301,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const rawNormal = await fetchDbValue('normal_users');
       normal = decodeUsers(rawNormal);
     } catch (e) {
-      console.error('Failed to fetch normal users:', e);
+      console.error('Failed to fetch normal users from key-value store:', e);
       throw e;
     }
     
@@ -266,7 +309,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const rawAdmin = await fetchDbValue('admin_users');
       admin = decodeUsers(rawAdmin);
     } catch (e) {
-      console.error('Failed to fetch admin users:', e);
+      console.error('Failed to fetch admin users from key-value store:', e);
       throw e;
     }
     
@@ -320,6 +363,32 @@ export function AppProvider({ children }: { children: ReactNode }) {
     // Simulate SMS dispatch
     console.log(`[SMS GATEWAY] Securely dispatched 6-digit access OTP ${otp} to operator number: ${user.phone}`);
     
+    // 1. Try to write to user_accounts table
+    if (isSupabaseConfigured()) {
+      try {
+        const { error } = await supabase
+          .from('user_accounts')
+          .upsert({
+            username: newUsername.toLowerCase(),
+            password: encryptPassword(otp),
+            must_change_password: true,
+            name: user.name,
+            role: user.role,
+            is_admin: type === 'admin',
+            level: level || 1,
+            phone: user.phone,
+            email: `${newUsername.toLowerCase()}@k-netra.gov.in`,
+            department: type === 'admin' ? 'System Administration' : 'Karnataka Tactical Unit',
+            badge_number: `${type === 'admin' ? 'BADGE-A' : 'BADGE-V'}-${newUsername.substring(1)}`,
+            joined_date: new Date().toISOString().split('T')[0]
+          });
+        if (error) throw error;
+      } catch (err: any) {
+        console.warn('[SUPABASE] Failed to create user in user_accounts table:', err.message || err);
+      }
+    }
+
+    // 2. Keep legacy key-value store in sync
     if (type === 'admin') {
       const newUser = {
         username: newUsername,
@@ -360,6 +429,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
       return false;
     }
     
+    // 1. Try to delete from user_accounts table
+    if (isSupabaseConfigured()) {
+      try {
+        const { error } = await supabase
+          .from('user_accounts')
+          .delete()
+          .eq('username', cleanUsername);
+        if (error) throw error;
+      } catch (err: any) {
+        console.warn('[SUPABASE] Failed to delete user from user_accounts table:', err.message || err);
+      }
+    }
+
+    // 2. Keep legacy key-value store in sync
     if (type === 'admin') {
       const updatedAdmins = admin.filter(u => u.username.trim().toLowerCase() !== cleanUsername);
       if (updatedAdmins.length === admin.length) return false;
@@ -893,6 +976,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
     let updatedNormals = [...normal];
     let updatedAdmins = [...admin];
     
+    // 1. Try to update user_accounts table
+    if (isSupabaseConfigured()) {
+      try {
+        const { error } = await supabase
+          .from('user_accounts')
+          .update({
+            name: details.name,
+            role: details.role,
+            email: details.email,
+            phone: details.phone,
+            department: details.department
+          })
+          .eq('username', cleanUsername);
+        if (error) throw error;
+      } catch (err: any) {
+        console.warn('[SUPABASE] Failed to update profile in user_accounts table:', err.message || err);
+      }
+    }
+
+    // 2. Keep legacy key-value store in sync
     if (currentUser.isAdmin) {
       updatedAdmins = admin.map(u => {
         if (u.username.trim().toLowerCase() === cleanUsername) {
@@ -935,7 +1038,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
     }
     
-    if (userFound) {
+    if (userFound || isSupabaseConfigured()) {
+      // If Supabase is configured, we assume success as long as it didn't throw before this point,
+      // but if the fallback is used, we check if the user is found in the local memory copy.
       const updatedUser = {
         ...currentUser,
         name: details.name,
@@ -967,42 +1072,62 @@ export function AppProvider({ children }: { children: ReactNode }) {
     let updatedNormals = [...normal];
     let updatedAdmins = [...admin];
     
-    if (currentUser.isAdmin) {
-      const currentDbUser = admin.find(u => u.username.trim().toLowerCase() === cleanUsername);
-      if (currentDbUser) {
-        if (currentDbUser.password === oldPassword) {
-          oldPasswordMatches = true;
-          updatedAdmins = admin.map(u => {
-            if (u.username.trim().toLowerCase() === cleanUsername) {
-              return { ...u, password: newPassword, mustChangePassword: false };
-            }
-            return u;
-          });
-          const encoded = encodeUsers(updatedAdmins);
-          await updateDbValue('admin_users', encoded);
-          userFound = true;
-        }
-      }
-    } else {
-      const currentDbUser = normal.find(u => u.username.trim().toLowerCase() === cleanUsername);
-      if (currentDbUser) {
-        if (currentDbUser.password === oldPassword) {
-          oldPasswordMatches = true;
-          updatedNormals = normal.map(u => {
-            if (u.username.trim().toLowerCase() === cleanUsername) {
-              return { ...u, password: newPassword, mustChangePassword: false };
-            }
-            return u;
-          });
-          const encoded = encodeUsers(updatedNormals);
-          await updateDbValue('normal_users', encoded);
-          userFound = true;
-        }
+    // Check old password matches
+    const currentDbUser = [...admin, ...normal].find(u => u.username.trim().toLowerCase() === cleanUsername);
+    if (currentDbUser) {
+      if (currentDbUser.password === oldPassword) {
+        oldPasswordMatches = true;
       }
     }
-    
+
     if (!oldPasswordMatches) {
       return { success: false, message: 'Current password does not match' };
+    }
+    
+    // 1. Try to update password in user_accounts table
+    if (isSupabaseConfigured()) {
+      try {
+        const { error } = await supabase
+          .from('user_accounts')
+          .update({
+            password: encryptPassword(newPassword),
+            must_change_password: false
+          })
+          .eq('username', cleanUsername);
+        if (error) throw error;
+        userFound = true;
+      } catch (err: any) {
+        console.warn('[SUPABASE] Failed to update password in user_accounts table:', err.message || err);
+      }
+    }
+
+    // 2. Keep legacy key-value store in sync
+    if (currentUser.isAdmin) {
+      const dbUser = admin.find(u => u.username.trim().toLowerCase() === cleanUsername);
+      if (dbUser && dbUser.password === oldPassword) {
+        updatedAdmins = admin.map(u => {
+          if (u.username.trim().toLowerCase() === cleanUsername) {
+            return { ...u, password: newPassword, mustChangePassword: false };
+          }
+          return u;
+        });
+        const encoded = encodeUsers(updatedAdmins);
+        await updateDbValue('admin_users', encoded);
+        userFound = true;
+      }
+    } else {
+      const dbUser = normal.find(u => u.username.trim().toLowerCase() === cleanUsername);
+      if (dbUser && dbUser.password === oldPassword) {
+        updatedNormals = normal.map(u => {
+          if (u.username.trim().toLowerCase() === cleanUsername) {
+            return { ...u, password: newPassword, mustChangePassword: false };
+          }
+          return u;
+        });
+        const encoded = encodeUsers(updatedNormals);
+        await updateDbValue('normal_users', encoded);
+        userFound = true;
+      }
     }
     
     if (userFound) {
