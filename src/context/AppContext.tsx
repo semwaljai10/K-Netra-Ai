@@ -721,6 +721,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     loadDynamicData();
 
+    // Setup background polling interval every 45 seconds to keep counts fully synchronized
+    const pollInterval = setInterval(loadDynamicData, 45000);
+
     // Subscribe to real-time database changes
     const channel = supabase
       .channel('schema-db-changes')
@@ -766,6 +769,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       });
 
     return () => {
+      clearInterval(pollInterval);
       supabase.removeChannel(channel);
     };
   }, []);

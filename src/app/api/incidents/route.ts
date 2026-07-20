@@ -22,35 +22,54 @@ export async function GET(request: NextRequest) {
     const severity = searchParams.get('severity');
     const crimeType = searchParams.get('crime_type');
 
-    let query = supabase
-      .from('fir_records')
-      .select('*')
-      .order('date_time_of_filing', { ascending: false });
+    let allData: any[] = [];
+    let from = 0;
+    const chunkSize = 1000;
+    let hasMore = true;
 
-    if (district && district !== 'ALL') {
-      query = query.eq('district', district);
-    }
-    if (status && status !== 'ALL') {
-      query = query.eq('case_status', status);
-    }
-    if (severity && severity !== 'ALL') {
-      query = query.eq('severity', severity);
-    }
-    if (crimeType && crimeType !== 'ALL') {
-      query = query.eq('crime_type', crimeType);
-    }
+    while (hasMore) {
+      let query = supabase
+        .from('fir_records')
+        .select('*')
+        .order('date_time_of_filing', { ascending: false })
+        .range(from, from + chunkSize - 1);
 
-    const { data, error } = await withTimeout(query, 2500);
+      if (district && district !== 'ALL') {
+        query = query.eq('district', district);
+      }
+      if (status && status !== 'ALL') {
+        query = query.eq('case_status', status);
+      }
+      if (severity && severity !== 'ALL') {
+        query = query.eq('severity', severity);
+      }
+      if (crimeType && crimeType !== 'ALL') {
+        query = query.eq('crime_type', crimeType);
+      }
 
-    if (error) {
-      console.error('Supabase fetch error:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      const { data, error } = await withTimeout(query, 5000);
+
+      if (error) {
+        console.error('Supabase fetch error:', error);
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+
+      if (data && data.length > 0) {
+        allData = [...allData, ...data];
+        if (data.length < chunkSize) {
+          hasMore = false;
+        } else {
+          from += chunkSize;
+        }
+      } else {
+        hasMore = false;
+      }
     }
 
     return NextResponse.json({
       success: true,
-      records: data || [],
-      count: data?.length || 0,
+      records: allData,
+      count: allData.length,
     });
   } catch (err: any) {
     console.error('Fetch incidents error:', err);

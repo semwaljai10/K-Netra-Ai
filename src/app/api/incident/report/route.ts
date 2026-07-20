@@ -204,10 +204,34 @@ export async function POST(request: Request) {
     const hasSuspectsToMatch = suspectsInput.some((s: any) => s.name && s.name !== 'Unknown' && s.name !== 'None');
     let existingRecords: any[] | null = null;
     if (hasSuspectsToMatch && isSupabaseConfigured()) {
-      const { data } = await supabase
-        .from('fir_records')
-        .select('district, data');
-      existingRecords = data;
+      let allRecords: any[] = [];
+      let from = 0;
+      const chunkSize = 1000;
+      let hasMore = true;
+      
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from('fir_records')
+          .select('district, data')
+          .range(from, from + chunkSize - 1);
+          
+        if (error) {
+          console.error('Supabase query error during suspect matching:', error);
+          break;
+        }
+        
+        if (data && data.length > 0) {
+          allRecords = [...allRecords, ...data];
+          if (data.length < chunkSize) {
+            hasMore = false;
+          } else {
+            from += chunkSize;
+          }
+        } else {
+          hasMore = false;
+        }
+      }
+      existingRecords = allRecords;
     }
 
     const resolvedSuspects = suspectsInput.map((sus: any, index: number) => {
